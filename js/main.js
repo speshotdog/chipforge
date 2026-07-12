@@ -85,10 +85,101 @@ async function boot() {
   $('btnClear').onclick = () => {
     if (!confirm('確定要把音格全部清空嗎？')) return;
     store.mutate(s => {
-      s.notes = {}; s.spans = {}; s.vels = {}; s.slides = {}; s.drums = {};
+      s.notes = {}; s.spans = {}; s.vels = {}; s.slides = {}; s.drums = {}; s.halves = {};
       s.secTags = null; s.seed = null;
     });
   };
+
+  // ===== 自訂畫布：最多 5 個存檔槽 =====
+  const SLOTS_LS = 'chipforge.slots.v1';
+  const SLOT_COUNT = 5;
+  const loadSlots = () => {
+    try { const a = JSON.parse(localStorage.getItem(SLOTS_LS)); if (Array.isArray(a)) return a; } catch (e) { }
+    return new Array(SLOT_COUNT).fill(null);
+  };
+  const saveSlots = arr => { try { localStorage.setItem(SLOTS_LS, JSON.stringify(arr)); } catch (e) { } };
+  let slots = loadSlots();
+  while (slots.length < SLOT_COUNT) slots.push(null);
+
+  let canvasDirty = false;
+  const dirtyDot = $('dirtyDot');
+  const markDirty = () => { canvasDirty = true; updateDirtyDot(); };
+  const clearDirty = () => { canvasDirty = false; updateDirtyDot(); };
+  function updateDirtyDot() {
+    const hasContent = Object.keys(store.song.notes).length || Object.keys(store.song.drums).length;
+    dirtyDot.classList.toggle('show', canvasDirty && !!hasContent);
+  }
+
+  const canvasModal = $('canvasModal');
+  $('btnCanvas').onclick = () => { renderSlots(); canvasModal.classList.remove('hidden'); };
+  $('btnCanvasClose').onclick = () => canvasModal.classList.add('hidden');
+  canvasModal.onclick = e => { if (e.target === canvasModal) canvasModal.classList.add('hidden'); };
+
+  const slotTitleOf = song => {
+    const t = THEMES[song.theme];
+    return (t ? t.label : song.theme || '自訂') + '　' + (song.steps / 16) + '小節';
+  };
+
+  function saveToSlot(i) {
+    const song = JSON.parse(JSON.stringify(store.song));
+    slots[i] = { title: slotTitleOf(song), ts: Date.now(), song };
+    saveSlots(slots);
+    clearDirty();
+    renderSlots();
+    forgeStatus.textContent = `已存到畫布 ${i + 1}`;
+  }
+  function loadFromSlot(i) {
+    const s = slots[i];
+    if (!s) return;
+    transport.stop();
+    store.applySong(JSON.parse(JSON.stringify(s.song)));
+    bpmInput.value = store.song.bpm; bpmVal.textContent = store.song.bpm;
+    synth.setBpm(store.song.bpm);
+    clearDirty();
+    canvasModal.classList.add('hidden');
+    forgeStatus.textContent = `已載入畫布 ${i + 1}`;
+  }
+  function deleteSlot(i) {
+    if (!slots[i]) return;
+    if (!confirm(`刪除畫布 ${i + 1}？`)) return;
+    slots[i] = null;
+    saveSlots(slots);
+    renderSlots();
+  }
+
+  function renderSlots() {
+    const body = $('slotsBody');
+    body.innerHTML = '';
+    slots.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'slot-row' + (s ? ' filled' : '');
+      const acts = document.createElement('div');
+      acts.className = 'slot-acts';
+      if (s) {
+        const d = new Date(s.ts);
+        const stamp = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        row.innerHTML = `<span class="slot-num">${i + 1}</span>
+          <div class="slot-info"><div class="slot-title">${s.title}</div><div class="slot-meta">${stamp} · ${s.song.bpm} BPM</div></div>`;
+        const bLoad = mkBtn('載入', 'gold', () => loadFromSlot(i));
+        const bOver = mkBtn('覆蓋', '', () => { if (confirm(`用目前畫布覆蓋畫布 ${i + 1}？`)) saveToSlot(i); });
+        const bDel = mkBtn('刪除', 'danger', () => deleteSlot(i));
+        acts.append(bLoad, bOver, bDel);
+      } else {
+        row.innerHTML = `<span class="slot-num">${i + 1}</span>
+          <div class="slot-info slot-empty">（空欄位）</div>`;
+        acts.append(mkBtn('存入此格', 'cyan', () => saveToSlot(i)));
+      }
+      row.appendChild(acts);
+      body.appendChild(row);
+    });
+  }
+  function mkBtn(label, cls, fn) {
+    const b = document.createElement('button');
+    b.className = 'px-btn sm' + (cls ? ' ' + cls : '');
+    b.textContent = label;
+    b.onclick = fn;
+    return b;
+  }
 
   // ===== 工具列 =====
   document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -638,11 +729,13 @@ async function boot() {
     refreshThemeChips();
   };
   store.onChange(syncUI);
+  store.onChange(() => markDirty()); // 任何編輯/鍛造都提醒「記得存畫布」
 
   // 吉祥物心跳
   setInterval(() => mascot.tick(transport.playing), 100);
 
   syncUI();
+  updateDirtyDot();
 }
 
 boot();

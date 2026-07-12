@@ -33,6 +33,7 @@
       <button id="btnUndo" class="px-btn sm" title="Ctrl+Z">◀復原</button>
       <button id="btnRedo" class="px-btn sm" title="Ctrl+Y">重做▶</button>
       <button id="btnClear" class="px-btn sm danger">清空</button>
+      <button id="btnCanvas" class="px-btn sm canvas-btn">🎨 畫布<span class="dirty-dot" id="dirtyDot"></span></button>
     </div>
     <div class="t-group vol-group">
       <span class="t-label">🔊</span>
@@ -147,8 +148,19 @@
   <button id="btnShare" class="px-btn sm cyan">🔗 分享連結</button>
   <input type="file" id="fileInput" accept=".json" hidden>
   <span class="ex-hint" id="exHint">曲子會自動保存在瀏覽器裡</span>
-  <span class="ver-badge" title="版本（更新後如果沒變，按 Ctrl+F5 強制重新整理）">v2026.07.12b</span>
+  <span class="ver-badge" title="版本（更新後如果沒變，按 Ctrl+F5 強制重新整理）">v2026.07.12c</span>
 </footer>
+
+<div id="canvasModal" class="modal hidden">
+  <div class="modal-box px-panel" style="width:min(560px,94vw)">
+    <div class="modal-head">
+      <span>🎨 自訂畫布</span>
+      <button id="btnCanvasClose" class="px-btn sm">✕ 關閉</button>
+    </div>
+    <div class="canvas-tip">💡 提示：重新鍛造、清空、載入都會蓋掉目前的畫布。喜歡的曲子記得先存到欄位！（存在瀏覽器，最多 5 格）</div>
+    <div id="slotsBody" class="slots-body"></div>
+  </div>
+</div>
 
 <div id="keysModal" class="modal hidden">
   <div class="modal-box px-panel" style="width:min(480px,94vw)">
@@ -176,6 +188,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=20260712b"></script>
+<script type="module" src="js/main.js?v=20260712c"></script>
 </body>
 </html>

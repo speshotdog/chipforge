@@ -4,7 +4,7 @@ import { ROWS, rowToMidi, NOTE_NAMES, pc, CHORD_CYCLE, CHORDS } from './theory.j
 import { SEC_INFO } from './themes.js';
 
 export const GUT = 46;       // 左側標籤欄
-export const SEC_H = 14;     // 段落色帶（兼時間尺）
+export const SEC_H = 28;     // 段落色帶（兼時間尺）— 加寬便於拖曳 scrub，不誤觸和弦
 export const CHORD_H = 20;   // 和弦列
 export const CELL_W = 20;    // 預設格寬（可縮放 10~40）
 export const CELL_H = 16;
