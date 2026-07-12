@@ -5,6 +5,7 @@ import { rowToMidi, ROWS } from './theory.js';
 export function scheduleStep(synth, song, mixer, step, time, sd) {
   if (mixer.swing && step % 2 === 1) time += sd * 0.28;
   const gate = 0.92;
+  const halves = song.halves || {};
   for (let r = 0; r < ROWS; r++) {
     const key = r + ',' + step;
     const inst = song.notes[key];
@@ -14,11 +15,21 @@ export function scheduleStep(synth, song, mixer, step, time, sd) {
     const midi = rowToMidi(r);
     let glide;
     if (song.slides[key] !== undefined) glide = rowToMidi(song.slides[key]);
-    synth.playNote(inst, midi, time, sd * span * gate, vel, glide);
+    if (halves[key]) { // 連打：一格打兩個 32 分音符
+      synth.playNote(inst, midi, time, sd * 0.45, vel, glide);
+      synth.playNote(inst, midi, time + sd / 2, sd * 0.45, vel, glide);
+    } else {
+      synth.playNote(inst, midi, time, sd * span * gate, vel, glide);
+    }
   }
   for (let l = 0; l < 3; l++) {
     const d = song.drums[l + ',' + step];
-    if (d) synth.playDrum(l, time, d === 2 ? 1.3 : 1);
+    if (!d) continue;
+    const v = d === 2 ? 1.3 : 1;
+    if (halves['d' + l + ',' + step]) {
+      synth.playDrum(l, time, v);
+      synth.playDrum(l, time + sd / 2, v * 0.85);
+    } else synth.playDrum(l, time, v);
   }
 }
 
@@ -30,9 +41,13 @@ export class Transport {
     this.timer = null;
     this.nextStep = 0;
     this.nextTime = 0;
+    this.lastStep = 0;    // 最後聽到/停留的位置（loop 點與貼上用）
+    this.loop = null;     // {a, b} 區間循環（含 b）
     this.onStep = null;   // (step, atTime) UI 播放頭
     this.onState = null;  // (playing)
   }
+
+  setLoop(loop) { this.loop = loop; }
 
   get sd() { return 60 / this.store.song.bpm / 4; }
 
@@ -68,8 +83,10 @@ export class Transport {
       scheduleStep(this.synth, song, mixer, step, this.nextTime, this.sd);
       const at = this.nextTime;
       const delay = Math.max(0, (at - ctx.currentTime) * 1000);
-      setTimeout(() => { if (this.playing) this.onStep?.(step); }, delay);
-      this.nextStep = (step + 1) % song.steps;
+      setTimeout(() => { if (this.playing) { this.lastStep = step; this.onStep?.(step); } }, delay);
+      let next = step + 1;
+      if (this.loop && (next > this.loop.b || next >= song.steps)) next = this.loop.a;
+      this.nextStep = next % song.steps;
       this.nextTime += this.sd;
     }
   }

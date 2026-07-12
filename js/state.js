@@ -11,7 +11,7 @@ const LS_GEN = 'chipforge.gen.v1';
 export function emptySong(bars = 8, bpm = 132) {
   return {
     version: 1, bpm, steps: bars * 16,
-    notes: {}, spans: {}, vels: {}, slides: {}, drums: {},
+    notes: {}, spans: {}, vels: {}, slides: {}, drums: {}, halves: {},
     chords: Array.from({ length: bars * 2 }, (_, i) => ['Am', 'F', 'C', 'G'][i % 4]),
     secTags: null, theme: 'bright', seed: null,
   };
@@ -98,8 +98,9 @@ export class Store {
       const old = s.chords;
       s.chords = Array.from({ length: segs }, (_, i) => old[i] || old[i % Math.max(1, old.length)] || 'Am');
       if (s.steps < oldSteps) {
-        for (const map of [s.notes, s.spans, s.vels, s.slides]) {
-          for (const k of Object.keys(map)) if (+k.split(',')[1] >= s.steps) delete map[k];
+        s.halves ||= {};
+        for (const map of [s.notes, s.spans, s.vels, s.slides, s.halves]) {
+          for (const k of Object.keys(map)) if (+String(k).replace(/^d/, '').split(',')[1] >= s.steps) delete map[k];
         }
         for (const k of Object.keys(s.drums)) if (+k.split(',')[1] >= s.steps) delete s.drums[k];
       }

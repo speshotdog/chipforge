@@ -54,6 +54,8 @@
       <button class="tool-btn t-bass" data-tool="bass"><i></i>貝斯</button>
       <button class="tool-btn t-noise" data-tool="noise"><i></i>噪音</button>
       <button class="tool-btn t-sus" data-tool="sus"><i></i>長音</button>
+      <button class="tool-btn t-half" data-tool="half" title="一格打兩下（32分連打），點音符或鼓切換"><i></i>連打</button>
+      <button class="tool-btn t-select" data-tool="select" title="拖曳框選，選中後可拖移/複製/刪除"><i></i>選取</button>
       <button class="tool-btn t-erase" data-tool="erase"><i></i>擦除</button>
     </div>
     <div class="tb-title">鼓組</div>
@@ -76,6 +78,32 @@
     <div class="rollscroll" id="rollScroll">
       <canvas id="roll"></canvas>
       <div id="playhead"></div>
+    </div>
+    <div class="opsbar">
+      <div class="ops-group">
+        <button id="opZoomOut" class="ops-btn" title="縮小時間軸">🔍−</button>
+        <button id="opZoomIn" class="ops-btn" title="放大時間軸">🔍＋</button>
+      </div>
+      <div class="ops-group">
+        <button id="opLoopA" class="ops-btn" title="在播放頭位置設循環起點">⇤A</button>
+        <button id="opLoopB" class="ops-btn" title="在播放頭位置設循環終點">B⇥</button>
+        <button id="opLoopClear" class="ops-btn" title="清除循環區間">✕循環</button>
+      </div>
+      <div class="ops-group">
+        <button id="opCopy" class="ops-btn" title="複製選取">複製</button>
+        <button id="opPaste" class="ops-btn" title="貼在播放頭位置">貼上</button>
+        <button id="opDelSel" class="ops-btn" title="刪除選取">刪除</button>
+      </div>
+      <div class="ops-group" id="viewBtns">
+        <span class="ops-label">👁</span>
+        <button class="ops-btn" data-view="">全</button>
+        <button class="ops-btn v-lead" data-view="lead">主</button>
+        <button class="ops-btn v-harm" data-view="harm">和</button>
+        <button class="ops-btn v-bass" data-view="bass">貝</button>
+        <button class="ops-btn v-noise" data-view="noise">噪</button>
+        <button class="ops-btn v-drum" data-view="drum">鼓</button>
+      </div>
+      <button id="opKeys" class="ops-btn" title="自訂快捷鍵">⌨</button>
     </div>
   </main>
 </div>
@@ -120,6 +148,19 @@
   <input type="file" id="fileInput" accept=".json" hidden>
   <span class="ex-hint" id="exHint">曲子會自動保存在瀏覽器裡</span>
 </footer>
+
+<div id="keysModal" class="modal hidden">
+  <div class="modal-box px-panel" style="width:min(480px,94vw)">
+    <div class="modal-head">
+      <span>⌨ 快捷鍵</span>
+      <button id="btnKeysClose" class="px-btn sm">✕ 關閉</button>
+    </div>
+    <div id="keysBody" class="mixer-body"></div>
+    <div class="modal-foot">
+      <button id="btnKeysReset" class="px-btn sm danger">恢復預設</button>
+    </div>
+  </div>
+</div>
 
 <div id="mixerModal" class="modal hidden">
   <div class="modal-box px-panel">

@@ -2,7 +2,7 @@
 import { Store, BAR_OPTIONS, defaultMixer } from './state.js';
 import { createLiveSynth } from './synth.js';
 import { Transport } from './scheduler.js';
-import { Roll, Mascot, GUT, CELL_W } from './ui.js';
+import { Roll, Mascot, GUT } from './ui.js';
 import { THEMES, CATEGORIES } from './themes.js';
 import { composeSong, nightVariant, NIGHT_MIXER_PATCH, extractMotif } from './composer.js';
 import { forge, varySeed, DIRECTOR_MODES, POWER_LEVELS, scoreSong, makeSeed } from './director.js';
@@ -23,10 +23,10 @@ async function boot() {
 
   const synth = await createLiveSynth(() => store.mixer);
   const transport = new Transport(synth, store);
-  const roll = new Roll($('roll'), store, transport);
+  const rollScroll = $('rollScroll');
+  const roll = new Roll($('roll'), store, transport, rollScroll);
   const mascot = new Mascot($('mascot'));
   const playhead = $('playhead');
-  const rollScroll = $('rollScroll');
 
   let busy = false;
   let candidates = [];
@@ -41,16 +41,16 @@ async function boot() {
   };
   transport.onStep = step => {
     playhead.style.opacity = 1;
-    playhead.style.left = (GUT + step * CELL_W) + 'px';
+    playhead.style.left = (GUT + step * roll.cw) + 'px';
     mascot.beat = Math.floor(step / 4);
-    const x = GUT + step * CELL_W;
+    const x = GUT + step * roll.cw;
     if (x < rollScroll.scrollLeft + 40 || x > rollScroll.scrollLeft + rollScroll.clientWidth - 60) {
       rollScroll.scrollLeft = Math.max(0, x - 80);
     }
   };
 
   // 時間軸 scrub：點/拖段落色帶從該處播放
-  roll.onSeek = step => transport.start(step);
+  roll.onSeek = step => { transport.lastStep = step; transport.start(step); };
 
   // ===== 頂欄 =====
   const bpmInput = $('bpm'), bpmVal = $('bpmVal');
@@ -495,18 +495,140 @@ async function boot() {
     body.appendChild(tgl);
   }
 
-  // ===== 鍵盤 =====
+  // ===== 快捷鍵系統（可自訂，存 localStorage）=====
+  const KEY_ACTIONS = [
+    ['play', '播放／停止', 'Space'],
+    ['undo', '復原', 'Ctrl+KeyZ'],
+    ['redo', '重做', 'Ctrl+KeyY'],
+    ['copy', '複製選取', 'Ctrl+KeyC'],
+    ['paste', '貼上（播放頭處）', 'Ctrl+KeyV'],
+    ['del', '刪除選取', 'Delete'],
+    ['loopIn', '循環起點 A', 'KeyI'],
+    ['loopOut', '循環終點 B', 'KeyO'],
+    ['loopClear', '清除循環', 'KeyL'],
+    ['zoomIn', '放大時間軸', 'Equal'],
+    ['zoomOut', '縮小時間軸', 'Minus'],
+  ];
+  const KEYS_LS = 'chipforge.keys.v1';
+  const defaultKeys = () => Object.fromEntries(KEY_ACTIONS.map(([id, , k]) => [id, k]));
+  let keymap = { ...defaultKeys(), zoomWheel: 'Ctrl' };
+  try { keymap = { ...keymap, ...JSON.parse(localStorage.getItem(KEYS_LS) || '{}') }; } catch (e) { }
+  const saveKeys = () => { try { localStorage.setItem(KEYS_LS, JSON.stringify(keymap)); } catch (e) { } };
+  const combo = e => (e.ctrlKey ? 'Ctrl+' : '') + (e.shiftKey ? 'Shift+' : '') + (e.altKey ? 'Alt+' : '') + e.code;
+  const prettyKey = k => k.replace('Key', '').replace('Digit', '').replace('Equal', '+').replace('Minus', '−');
+
+  function setLoopPoint(which) {
+    const step = Math.max(0, Math.min(store.song.steps - 1, transport.lastStep || 0));
+    const cur = transport.loop;
+    let a, b;
+    if (which === 'a') { a = step; b = (cur && cur.b >= step) ? cur.b : store.song.steps - 1; }
+    else { b = step; a = (cur && cur.a <= step) ? cur.a : 0; }
+    transport.setLoop({ a, b });
+    forgeStatus.textContent = `循環區間：第 ${Math.floor(a / 16) + 1}~${Math.floor(b / 16) + 1} 小節`;
+    roll.render();
+  }
+
+  const ACTIONS = {
+    play: () => transport.toggle(),
+    undo: () => store.undo(),
+    redo: () => store.redo(),
+    copy: () => { forgeStatus.textContent = roll.copySel() ? '已複製選取內容' : '沒有選取內容（先用「選取」工具框選）'; },
+    paste: () => { if (!roll.pasteAt(null, transport.lastStep || 0)) forgeStatus.textContent = '剪貼簿是空的'; },
+    del: () => { if (!roll.deleteSel()) forgeStatus.textContent = '沒有選取內容'; },
+    loopIn: () => setLoopPoint('a'),
+    loopOut: () => setLoopPoint('b'),
+    loopClear: () => { transport.setLoop(null); roll.render(); forgeStatus.textContent = '循環已清除'; },
+    zoomIn: () => roll.setZoom(roll.cw + 4, rollScroll.getBoundingClientRect().left + rollScroll.clientWidth / 2),
+    zoomOut: () => roll.setZoom(roll.cw - 4, rollScroll.getBoundingClientRect().left + rollScroll.clientWidth / 2),
+  };
+
+  let keyCapture = null; // 正在重新綁定的動作 id
   document.addEventListener('keydown', e => {
+    if (keyCapture) {
+      e.preventDefault();
+      if (['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight'].includes(e.code)) return;
+      if (e.code === 'Escape') { keyCapture = null; buildKeysModal(); return; }
+      keymap[keyCapture] = combo(e);
+      keyCapture = null;
+      saveKeys();
+      buildKeysModal();
+      return;
+    }
     if (e.target.matches('input, select, textarea')) return;
-    if (e.code === 'Space') { e.preventDefault(); transport.toggle(); }
-    else if (e.ctrlKey && e.key === 'z') { e.preventDefault(); store.undo(); }
-    else if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); store.redo(); }
+    if (e.code === 'Escape') { roll.clearSel(); return; }
+    const cb = combo(e);
+    const hit = Object.entries(keymap).find(([id, v]) => v === cb && ACTIONS[id]);
+    if (hit) { e.preventDefault(); ACTIONS[hit[0]](); }
   });
+
+  // Ctrl(可改)+滾輪 縮放時間軸
+  rollScroll.addEventListener('wheel', e => {
+    const mod = keymap.zoomWheel || 'Ctrl';
+    const has = mod === 'Ctrl' ? e.ctrlKey : mod === 'Alt' ? e.altKey : e.shiftKey;
+    if (!has) return;
+    e.preventDefault();
+    roll.setZoom(roll.cw + (e.deltaY < 0 ? 2 : -2), e.clientX);
+  }, { passive: false });
+
+  // ===== 操作按鈕列 =====
+  $('opZoomIn').onclick = ACTIONS.zoomIn;
+  $('opZoomOut').onclick = ACTIONS.zoomOut;
+  $('opLoopA').onclick = ACTIONS.loopIn;
+  $('opLoopB').onclick = ACTIONS.loopOut;
+  $('opLoopClear').onclick = ACTIONS.loopClear;
+  $('opCopy').onclick = ACTIONS.copy;
+  $('opPaste').onclick = ACTIONS.paste;
+  $('opDelSel').onclick = ACTIONS.del;
+  document.querySelectorAll('#viewBtns [data-view]').forEach(btn => {
+    btn.onclick = () => {
+      roll.viewInst = btn.dataset.view || null;
+      document.querySelectorAll('#viewBtns [data-view]').forEach(b =>
+        b.classList.toggle('active', b === btn));
+      roll.render();
+    };
+  });
+  document.querySelector('#viewBtns [data-view=""]').classList.add('active');
+
+  // ===== 快捷鍵設定視窗 =====
+  const keysModal = $('keysModal');
+  $('opKeys').onclick = () => { buildKeysModal(); keysModal.classList.remove('hidden'); };
+  $('btnKeysClose').onclick = () => { keyCapture = null; keysModal.classList.add('hidden'); };
+  keysModal.onclick = e => { if (e.target === keysModal) { keyCapture = null; keysModal.classList.add('hidden'); } };
+  $('btnKeysReset').onclick = () => {
+    keymap = { ...defaultKeys(), zoomWheel: 'Ctrl' };
+    saveKeys(); buildKeysModal();
+  };
+
+  function buildKeysModal() {
+    const body = $('keysBody');
+    body.innerHTML = '';
+    KEY_ACTIONS.forEach(([id, label]) => {
+      const row = document.createElement('div');
+      row.className = 'key-row';
+      const btn = document.createElement('button');
+      btn.className = 'key-btn' + (keyCapture === id ? ' listening' : '');
+      btn.textContent = keyCapture === id ? '按下新按鍵…' : prettyKey(keymap[id] || '—');
+      btn.onclick = () => { keyCapture = keyCapture === id ? null : id; buildKeysModal(); };
+      row.innerHTML = `<span>${label}</span>`;
+      row.appendChild(btn);
+      body.appendChild(row);
+    });
+    const wrow = document.createElement('div');
+    wrow.className = 'key-row';
+    wrow.innerHTML = `<span>縮放滾輪修飾鍵</span>`;
+    const sel = document.createElement('select');
+    sel.innerHTML = '<option>Ctrl</option><option>Alt</option><option>Shift</option>';
+    sel.value = keymap.zoomWheel || 'Ctrl';
+    sel.onchange = () => { keymap.zoomWheel = sel.value; saveKeys(); };
+    wrow.appendChild(sel);
+    body.appendChild(wrow);
+  }
 
   // ===== store 變更 → UI 同步 =====
   let lastSteps = 0;
   const syncUI = () => {
     const s = store.song;
+    if (transport.loop && transport.loop.b >= s.steps) transport.setLoop(null); // 曲長變短時清掉失效循環
     if (s.steps !== lastSteps) { lastSteps = s.steps; roll.resize(); }
     else roll.render();
     bpmInput.value = s.bpm; bpmVal.textContent = s.bpm;

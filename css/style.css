@@ -255,6 +255,8 @@ body {
 .tool-btn.t-bass i { background: var(--bass); }
 .tool-btn.t-noise i { background: var(--noise); }
 .tool-btn.t-sus i { background: linear-gradient(90deg, var(--ink) 0 4px, transparent 4px 6px, var(--ink) 6px); }
+.tool-btn.t-half i { background: linear-gradient(90deg, var(--amber) 0 4px, transparent 4px 6px, var(--amber) 6px 10px); }
+.tool-btn.t-select i { background: transparent; border: 2px dashed var(--amber); width: 6px; height: 6px; }
 .tool-btn.t-erase i { background: transparent; border: 2px solid var(--dim); width: 6px; height: 6px; }
 .tool-btn:hover { color: var(--ink); background: rgba(255,255,255,.04); }
 .tool-btn.active {
@@ -291,6 +293,52 @@ body {
   opacity: 0;
   pointer-events: none;
 }
+
+/* ===== 操作按鈕列（剪輯式）===== */
+.rollwrap { flex-direction: column; gap: 6px; }
+.opsbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 2px 2px 0;
+}
+.ops-group { display: flex; gap: 3px; align-items: center; }
+.ops-label { color: var(--dim); margin-right: 2px; }
+.ops-btn {
+  font-family: inherit; font-size: 12px;
+  color: var(--dim);
+  background: var(--lo);
+  border: 2px solid var(--line);
+  padding: 4px 7px 3px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ops-btn:hover { color: var(--ink); border-color: var(--hi); }
+.ops-btn:active { transform: translateY(1px); }
+.ops-btn.active {
+  color: #170e00;
+  background: var(--amber);
+  border-color: #b57a12;
+}
+.ops-btn.v-lead.active { background: var(--lead); }
+.ops-btn.v-harm.active { background: var(--harm); }
+.ops-btn.v-bass.active { background: var(--bass); }
+.ops-btn.v-noise.active { background: var(--noise); }
+.ops-btn.v-drum.active { background: var(--hat); }
+
+.key-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.key-row span { color: var(--dim); }
+.key-btn {
+  font-family: 'PressStart', monospace; font-size: 8px;
+  min-width: 110px;
+  color: var(--hat);
+  background: var(--lo);
+  border: 2px solid var(--line);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.key-btn.listening { color: #170e00; background: var(--amber); animation: playPulse .5s steps(2) infinite; }
 
 /* ===== 鍛造面板 ===== */
 .genpanel {
