@@ -61,6 +61,16 @@ async function boot() {
     store.save();
   };
 
+  const masterVol = $('masterVol'), masterVolVal = $('masterVolVal');
+  masterVol.value = store.mixer.master ?? 60;
+  masterVolVal.textContent = masterVol.value;
+  masterVol.oninput = () => {
+    store.mixer.master = +masterVol.value;
+    masterVolVal.textContent = masterVol.value;
+    synth.syncMixer();
+    store.save();
+  };
+
   const barPicker = $('barPicker');
   BAR_OPTIONS.forEach(b => {
     const btn = document.createElement('button');
@@ -193,6 +203,14 @@ async function boot() {
     const theme = store.song.theme in THEMES ? store.song.theme : 'bright';
     const count = (POWER_LEVELS.find(p => p.id === store.gen.power) || POWER_LEVELS[1]).count;
     forgeStatus.textContent = `熔爐加熱中 0/${count}`;
+    // 曲風配器提示：抒情系自動換鋼琴主奏；沒有提示的曲風把鋼琴還原成方波
+    const tone = THEMES[theme].tone;
+    if (tone) {
+      store.mixer.duty = { ...store.mixer.duty, ...tone };
+    } else if (store.mixer.duty.lead === 'piano') {
+      store.mixer.duty = { ...store.mixer.duty, lead: '25%' };
+    }
+    synth.syncMixer();
     try {
       const picked = await forge({
         theme, steps: store.song.steps, gen: store.gen, count,
@@ -434,10 +452,10 @@ async function boot() {
     opts.className = 'mx-opts';
     opts.innerHTML = `
       <label>主旋律波形 <select data-k="dutyLead">
-        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option>
+        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option>
       </select></label>
       <label>和聲波形 <select data-k="dutyHarm">
-        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option>
+        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option>
       </select></label>
       <label>貝斯 <select data-k="bassWave">
         <option value="tri">三角波</option><option value="pulse">方波</option><option value="slap">擊弦</option>
@@ -462,7 +480,7 @@ async function boot() {
     slider('回音量', () => m.echo, v => m.echo = v);
     slider('回音回饋', () => m.echoFb, v => m.echoFb = v);
     slider('長音衰減', () => m.susDecay, v => m.susDecay = v);
-    slider('總音量', () => m.master, v => m.master = v);
+    slider('總音量', () => m.master, v => { m.master = v; masterVol.value = v; masterVolVal.textContent = v; });
     const tgl = document.createElement('div');
     tgl.className = 'mx-opts';
     tgl.innerHTML = `

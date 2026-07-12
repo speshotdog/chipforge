@@ -120,7 +120,7 @@ export class ChipSynth {
 
     const gn = ctx.createGain();
     const osc = ctx.createOscillator();
-    let vol2 = vol, extra = null, punch = false;
+    let vol2 = vol, extra = null, punch = false, piano = false;
 
     if (inst === 'bass') {
       midi -= 12; dur *= 1.1;
@@ -129,17 +129,26 @@ export class ChipSynth {
       else if (m.bassWave === 'slap') { osc.type = 'triangle'; vol2 = vol * 1.1; punch = true; }
       else osc.type = 'triangle';
     } else {
-      const duty = DUTY_VAL[(m.duty || {})[inst]] ?? (inst === 'lead' ? 0.25 : 0.125);
-      osc.setPeriodicWave(this.waves[duty]);
-      if (inst === 'lead' && m.pwm) {
-        osc.detune.value = -6; vol2 = vol * 0.55;
-        extra = { detune: 6, gain: 1, duty };
-      }
-      if ((m.vibrato ?? 35) > 0) {
-        const lfo = ctx.createOscillator(), lg = ctx.createGain();
-        lfo.frequency.value = 5.6; lg.gain.value = (m.vibrato ?? 35) / 40 * 7;
-        lfo.connect(lg); lg.connect(osc.detune);
-        lfo.start(time); lfo.stop(time + dur + 0.4);
+      const dutySel = (m.duty || {})[inst] || (inst === 'lead' ? '25%' : '12.5%');
+      if (dutySel === 'piano') {
+        // 鋼琴：脈衝波主體 + 高八度微失諧泛音，槌擊起音後自然衰減的長尾
+        osc.setPeriodicWave(this.waves[0.25]);
+        vol2 = vol * 1.25;
+        piano = true;
+        extra = { freqMul: 2, gain: 0.22, duty: 0.5, detune: 4 };
+      } else {
+        const duty = DUTY_VAL[dutySel] ?? (inst === 'lead' ? 0.25 : 0.125);
+        osc.setPeriodicWave(this.waves[duty]);
+        if (inst === 'lead' && m.pwm) {
+          osc.detune.value = -6; vol2 = vol * 0.55;
+          extra = { detune: 6, gain: 1, duty };
+        }
+        if ((m.vibrato ?? 35) > 0) {
+          const lfo = ctx.createOscillator(), lg = ctx.createGain();
+          lfo.frequency.value = 5.6; lg.gain.value = (m.vibrato ?? 35) / 40 * 7;
+          lfo.connect(lg); lg.connect(osc.detune);
+          lfo.start(time); lfo.stop(time + dur + 0.4);
+        }
       }
     }
 
@@ -154,17 +163,26 @@ export class ChipSynth {
       osc.frequency.exponentialRampToValueAtTime(f, time + 0.06);
     }
 
-    gn.gain.setValueAtTime(0, time);
-    gn.gain.linearRampToValueAtTime(vol2, time + 0.004);
-    gn.gain.setTargetAtTime(vol2 * 0.6, time + 0.012, 0.06);
-    if (dur > 0.25) {
-      const dk = (m.susDecay ?? 78) / 100;
-      if (dk > 0) {
-        const floor = vol2 * 0.6 * Math.max(0.05, 1 - dk);
-        gn.gain.setTargetAtTime(floor, time + 0.15, Math.max(0.08, dur * (1 - dk) * 0.8 + 0.08));
+    if (piano) {
+      // 槌擊 → 快速回落 → 會自己唱完的長尾（不受 susDecay 影響）
+      gn.gain.setValueAtTime(0, time);
+      gn.gain.linearRampToValueAtTime(vol2, time + 0.003);
+      gn.gain.setTargetAtTime(vol2 * 0.35, time + 0.01, 0.07);
+      gn.gain.setTargetAtTime(0.0001, time + 0.2, 0.5);
+      gn.gain.setTargetAtTime(0, time + dur, 0.04);
+    } else {
+      gn.gain.setValueAtTime(0, time);
+      gn.gain.linearRampToValueAtTime(vol2, time + 0.004);
+      gn.gain.setTargetAtTime(vol2 * 0.6, time + 0.012, 0.06);
+      if (dur > 0.25) {
+        const dk = (m.susDecay ?? 78) / 100;
+        if (dk > 0) {
+          const floor = vol2 * 0.6 * Math.max(0.05, 1 - dk);
+          gn.gain.setTargetAtTime(floor, time + 0.15, Math.max(0.08, dur * (1 - dk) * 0.8 + 0.08));
+        }
       }
+      gn.gain.setTargetAtTime(0, time + dur, 0.025);
     }
-    gn.gain.setTargetAtTime(0, time + dur, 0.025);
 
     osc.connect(gn);
     gn.connect(this.out(inst));

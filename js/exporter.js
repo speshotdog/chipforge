@@ -79,6 +79,8 @@ export function exportMidi(song, mixer) {
     lead: { ch: 0, prog: 80 }, harm: { ch: 1, prog: 81 },
     bass: { ch: 2, prog: 38 }, noise: { ch: 3, prog: 99 },
   };
+  if ((mixer.duty || {}).lead === 'piano') CHS.lead.prog = 0;  // 平台鋼琴
+  if ((mixer.duty || {}).harm === 'piano') CHS.harm.prog = 0;
   const tracks = [];
 
   // 速度軌

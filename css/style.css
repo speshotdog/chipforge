@@ -189,6 +189,9 @@ body {
   box-shadow: inset 2px 2px 0 #ffe9a1, inset -2px -2px 0 #b57a12;
 }
 
+.vol-range { width: 90px; }
+.vol-range::-webkit-slider-thumb { background: var(--hat); border-color: #063346; box-shadow: inset 2px 2px 0 #b5ecff, inset -2px -2px 0 #2a89b0; }
+
 .seed-badge {
   font-family: 'PressStart', monospace;
   font-size: 8px;

@@ -171,6 +171,7 @@ export const THEMES = {
   },
   rainynight: {
     label: '雨夜咖啡', icon: '☕', bpm: [72, 96], scale: [0, 2, 4, 5, 7, 9, 11],
+    tone: { lead: 'piano' },
     progs: [['Cmaj7', 'Am7', 'Dm7', 'G7'], ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7'], ['Am7', 'Dm7', 'G7', 'Cmaj7']],
     rhythms: [[0, 3], [0, 4, 7], [0, 3, 6], [0, 2, 5], [0, 4]],
     bassPat: [[0, 'r'], [4, '5'], [7, '3']],
@@ -208,6 +209,7 @@ export const THEMES = {
   },
   station: {
     label: '車站月台', icon: '▤', bpm: [96, 120], scale: [0, 2, 4, 5, 7, 9, 11],
+    tone: { lead: 'piano' },
     progs: [['C', 'Em7', 'F', 'G7'], ['C', 'Am7', 'F', 'G'], ['Fmaj7', 'G', 'Em7', 'Am7']],
     rhythms: [[0, 4], [0, 4, 6], [0, 3, 6], [0, 2, 4, 6]],
     bassPat: [[0, 'r'], [4, '5'], [6, 'r']],
@@ -281,6 +283,7 @@ export const THEMES = {
   },
   ballroom: {
     label: '城堡舞會', icon: '❦', bpm: [100, 126], scale: [0, 2, 4, 5, 7, 9, 11],
+    tone: { lead: 'piano' },
     progs: [['C', 'G', 'Am', 'G'], ['C', 'Em', 'F', 'G'], ['F', 'G', 'C', 'Am']],
     rhythms: [[0, 3, 6], [0, 3], [0, 3, 5], [0, 2, 4, 6]],
     bassPat: [[0, 'r'], [3, '5'], [6, '5']],
@@ -295,6 +298,7 @@ export const THEMES = {
   },
   musicbox: {
     label: '音樂盒回憶', icon: '♩', bpm: [66, 88], scale: [0, 2, 4, 5, 7, 9, 11],
+    tone: { lead: 'piano' },
     progs: [['C', 'Am', 'F', 'G'], ['Am', 'F', 'C', 'G'], ['C', 'Em', 'Am', 'F']],
     rhythms: [[0, 4], [0, 3, 6], [0, 6], [0, 2, 4]],
     bassPat: [[0, 'r'], [6, 'o']],
@@ -426,6 +430,7 @@ export const THEMES = {
   },
   bonds: {
     label: '羈絆之歌', icon: '❤', bpm: [72, 96], scale: [0, 2, 4, 5, 7, 9, 11],
+    tone: { lead: 'piano' },
     progs: [['C', 'Em', 'F', 'G'], ['C', 'Am', 'F', 'G'], ['F', 'G', 'Em', 'Am'], ['F', 'C', 'G', 'C']],
     rhythms: [[0, 3, 6], [0, 4], [0, 3], [0, 4, 6], [0, 2, 5]],
     bassPat: [[0, 'r'], [3, '5'], [6, 'o']],
@@ -433,6 +438,7 @@ export const THEMES = {
   },
   determination: {
     label: '決意時刻', icon: '✦', bpm: [64, 86], scale: [9, 11, 0, 2, 4, 5, 7],
+    tone: { lead: 'piano' },
     progs: [['Am', 'F', 'C', 'G'], ['Am', 'C', 'F', 'G'], ['Am', 'Em', 'F', 'G']],
     rhythms: [[0, 4], [0, 6], [0, 3, 6], [0, 4, 7], [0]],
     bassPat: [[0, 'r'], [6, '5']],

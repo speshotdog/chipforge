@@ -475,9 +475,10 @@ export function nightVariant(day) {
 }
 
 // 夜版建議混音（套用時備份原值，切回日版還原）
+// 夜版主奏自動換鋼琴 —— Undertale 式「回憶版」質感
 export const NIGHT_MIXER_PATCH = {
   echo: 18, echoFb: 34, vibrato: 48, susDecay: 62,
-  duty: { lead: '12.5%', harm: '12.5%' },
+  duty: { lead: 'piano', harm: '12.5%' },
   vol: { noise: 40, drum: 58 },
 };
 
