@@ -513,6 +513,14 @@ body {
   margin-right: 8px;
 }
 .ex-hint { margin-left: auto; color: var(--dim); opacity: .75; }
+.ver-badge {
+  font-family: 'PressStart', monospace;
+  font-size: 8px;
+  color: var(--dim);
+  border: 2px solid var(--line);
+  padding: 4px 6px;
+  opacity: .8;
+}
 
 /* ===== 混音台 ===== */
 .modal {
