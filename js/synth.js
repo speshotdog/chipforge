@@ -118,9 +118,12 @@ export class ChipSynth {
 
     if (inst === 'noise') return this.playNoise(midi, time, dur, vol, m);
 
+    const toneSel = inst === 'bass' ? null : ((m.duty || {})[inst] || (inst === 'lead' ? '25%' : '12.5%'));
+    if (toneSel === 'pluck') return this.playPluck(midi, time, dur, vol * 1.15, inst);
+
     const gn = ctx.createGain();
     const osc = ctx.createOscillator();
-    let vol2 = vol, extra = null, punch = false, piano = false;
+    let vol2 = vol, extra = null, punch = false, piano = false, bell = false, organ = false, wantVib = false;
 
     if (inst === 'bass') {
       midi -= 12; dur *= 1.1;
@@ -129,13 +132,49 @@ export class ChipSynth {
       else if (m.bassWave === 'slap') { osc.type = 'triangle'; vol2 = vol * 1.1; punch = true; }
       else osc.type = 'triangle';
     } else {
-      const dutySel = (m.duty || {})[inst] || (inst === 'lead' ? '25%' : '12.5%');
+      const dutySel = toneSel;
+      const f0 = this.freq(midi);
       if (dutySel === 'piano') {
         // 鋼琴：脈衝波主體 + 高八度微失諧泛音，槌擊起音後自然衰減的長尾
         osc.setPeriodicWave(this.waves[0.25]);
         vol2 = vol * 1.25;
         piano = true;
         extra = { freqMul: 2, gain: 0.22, duty: 0.5, detune: 4 };
+      } else if (dutySel === 'fm') {
+        // FM 電鋼：正弦載波 + 2 倍頻調變器急速回落——16bit RPG 抒情主奏質感
+        osc.type = 'sine';
+        vol2 = vol * 1.5;
+        piano = true; // 借用鋼琴包絡（槌擊起音＋自然長尾）
+        const mod = ctx.createOscillator(), mg = ctx.createGain();
+        mod.type = 'sine';
+        mod.frequency.value = f0 * 2;
+        mg.gain.setValueAtTime(f0 * 2.2, time);
+        mg.gain.setTargetAtTime(f0 * 0.15, time + 0.01, 0.18);
+        mod.connect(mg); mg.connect(osc.frequency);
+        mod.start(time); mod.stop(time + dur + 0.4);
+      } else if (dutySel === 'bell') {
+        // 音樂盒/鐘琴：正弦 + 微失諧三倍頻泛音，敲擊後自然長衰減
+        osc.type = 'sine';
+        vol2 = vol * 1.6;
+        bell = true;
+        extra = { freqMul: 3.02, gain: 0.35, type: 'sine', detune: 0 };
+      } else if (dutySel === 'organ') {
+        // 管風琴/笛：疊泛音持續長音（神殿、聖堂、圖書館）
+        this.organWave ||= (() => {
+          const n = 8, re = new Float32Array(n), im = new Float32Array(n);
+          im[1] = 1; im[2] = 0.6; im[3] = 0.35; im[4] = 0.2; im[6] = 0.12;
+          return ctx.createPeriodicWave(re, im);
+        })();
+        osc.setPeriodicWave(this.organWave);
+        vol2 = vol * 0.9;
+        organ = true;
+      } else if (dutySel === 'saw') {
+        // 鋸齒波雙簧微失諧——C64 SID／早期電腦遊戲系 lead
+        osc.type = 'sawtooth';
+        osc.detune.value = -4;
+        vol2 = vol * 0.6;
+        extra = { gain: 1, type: 'sawtooth', detune: 5 };
+        wantVib = true;
       } else {
         const duty = DUTY_VAL[dutySel] ?? (inst === 'lead' ? 0.25 : 0.125);
         osc.setPeriodicWave(this.waves[duty]);
@@ -143,12 +182,18 @@ export class ChipSynth {
           osc.detune.value = -6; vol2 = vol * 0.55;
           extra = { detune: 6, gain: 1, duty };
         }
-        if ((m.vibrato ?? 35) > 0) {
-          const lfo = ctx.createOscillator(), lg = ctx.createGain();
-          lfo.frequency.value = 5.6; lg.gain.value = (m.vibrato ?? 35) / 40 * 7;
-          lfo.connect(lg); lg.connect(osc.detune);
-          lfo.start(time); lfo.stop(time + dur + 0.4);
-        }
+        wantVib = true;
+      }
+      if (wantVib && (m.vibrato ?? 35) > 0) {
+        // 延遲揉音：先直音、約 0.13 秒後才揉進來（模擬真人演奏，短音自然不揉）
+        const lfo = ctx.createOscillator(), lg = ctx.createGain();
+        lfo.frequency.value = 5.6;
+        const vibAmt = (m.vibrato ?? 35) / 40 * 7;
+        lg.gain.setValueAtTime(0, time);
+        lg.gain.setValueAtTime(0, time + 0.13);
+        lg.gain.linearRampToValueAtTime(vibAmt, time + 0.32);
+        lfo.connect(lg); lg.connect(osc.detune);
+        lfo.start(time); lfo.stop(time + dur + 0.4);
       }
     }
 
@@ -170,6 +215,17 @@ export class ChipSynth {
       gn.gain.setTargetAtTime(vol2 * 0.35, time + 0.01, 0.07);
       gn.gain.setTargetAtTime(0.0001, time + 0.2, 0.5);
       gn.gain.setTargetAtTime(0, time + dur, 0.04);
+    } else if (bell) {
+      // 敲擊後自由振鈴，不被音長硬切（音樂盒的殘響感）
+      gn.gain.setValueAtTime(0, time);
+      gn.gain.linearRampToValueAtTime(vol2, time + 0.002);
+      gn.gain.setTargetAtTime(0.0001, time + 0.02, 0.45);
+      gn.gain.setTargetAtTime(0, time + Math.max(dur, 0.8), 0.05);
+    } else if (organ) {
+      // 平滑起音、全延音、柔放
+      gn.gain.setValueAtTime(0, time);
+      gn.gain.linearRampToValueAtTime(vol2, time + 0.04);
+      gn.gain.setTargetAtTime(0, time + dur, 0.08);
     } else {
       gn.gain.setValueAtTime(0, time);
       gn.gain.linearRampToValueAtTime(vol2, time + 0.004);
@@ -188,17 +244,57 @@ export class ChipSynth {
     gn.connect(this.out(inst));
     if (inst !== 'bass') gn.connect(this.echoSend);
 
+    const tail = bell ? Math.max(dur, 0.8) + 0.6 : dur + 0.4;
     if (extra) {
       const eo = ctx.createOscillator();
-      eo.setPeriodicWave(this.waves[extra.duty]);
-      eo.frequency.value = f;
-      if (gf) { eo.frequency.setValueAtTime(f, time); eo.frequency.linearRampToValueAtTime(gf, time + Math.max(0.02, dur)); }
+      const fm2 = extra.freqMul || 1;
+      if (extra.duty) eo.setPeriodicWave(this.waves[extra.duty]);
+      else eo.type = extra.type || 'sine';
+      eo.frequency.value = f * fm2;
+      if (gf) { eo.frequency.setValueAtTime(f * fm2, time); eo.frequency.linearRampToValueAtTime(gf * fm2, time + Math.max(0.02, dur)); }
       eo.detune.value = extra.detune;
       const eg = ctx.createGain(); eg.gain.value = extra.gain;
       eo.connect(eg); eg.connect(gn);
-      eo.start(time); eo.stop(time + dur + 0.4);
+      eo.start(time); eo.stop(time + tail);
     }
-    osc.start(time); osc.stop(time + dur + 0.4);
+    osc.start(time); osc.stop(time + tail);
+  }
+
+  // Karplus-Strong 撥弦：噪音激發＋延遲線回授，實際合成進 buffer（WebAudio 回授迴圈
+  // 有 128 樣本下限、對 lead 音域行不通，所以離線算好）。同音高共用快取。
+  ksBuffer(midi) {
+    this._ks ||= {};
+    if (this._ks[midi]) return this._ks[midi];
+    const rate = this.ctx.sampleRate;
+    const N = Math.max(2, Math.round(rate / this.freq(midi)));
+    const len = Math.floor(rate * 1.2);
+    const buf = this.ctx.createBuffer(1, len, rate);
+    const d = buf.getChannelData(0);
+    const ring = new Float32Array(N);
+    for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+    let idx = 0;
+    for (let i = 0; i < len; i++) {
+      const cur = ring[idx];
+      d[i] = cur;
+      ring[idx] = (cur + ring[(idx + 1) % N]) * 0.5 * 0.996; // 平均濾波＝自然阻尼
+      idx = (idx + 1) % N;
+    }
+    this._ks[midi] = buf;
+    return buf;
+  }
+
+  playPluck(midi, time, dur, vol, inst) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.ksBuffer(midi);
+    const gn = ctx.createGain();
+    gn.gain.setValueAtTime(vol, time);
+    gn.gain.setTargetAtTime(0, time + Math.max(dur, 0.12), 0.05);
+    src.connect(gn);
+    gn.connect(this.out(inst));
+    gn.connect(this.echoSend);
+    src.start(time);
+    src.stop(time + Math.min(1.2, dur + 0.6));
   }
 
   playNoise(midi, time, dur, vol, m) {

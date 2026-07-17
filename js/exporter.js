@@ -79,8 +79,12 @@ export function exportMidi(song, mixer) {
     lead: { ch: 0, prog: 80 }, harm: { ch: 1, prog: 81 },
     bass: { ch: 2, prog: 38 }, noise: { ch: 3, prog: 99 },
   };
-  if ((mixer.duty || {}).lead === 'piano') CHS.lead.prog = 0;  // 平台鋼琴
-  if ((mixer.duty || {}).harm === 'piano') CHS.harm.prog = 0;
+  // 音色 → GM 音色對應（song.tone 優先於混音台設定）
+  const TONE_PROG = { piano: 0, fm: 4, bell: 10, pluck: 24, saw: 81, organ: 19 };
+  const leadTone = (song.tone || {}).lead || (mixer.duty || {}).lead;
+  const harmTone = (song.tone || {}).harm || (mixer.duty || {}).harm;
+  if (TONE_PROG[leadTone] !== undefined) CHS.lead.prog = TONE_PROG[leadTone];
+  if (TONE_PROG[harmTone] !== undefined) CHS.harm.prog = TONE_PROG[harmTone];
   const tracks = [];
 
   // 速度軌
@@ -97,6 +101,7 @@ export function exportMidi(song, mixer) {
       const [r, c] = k.split(',').map(Number);
       let midi = rowToMidi(r);
       if (inst === 'bass') midi -= 12;
+      if (inst !== 'noise') midi += song.transpose || 0;
       const span = song.spans[k] || 1;
       const vel = [70, 95, 118][(song.vels[k] || 1) - 1] || 95;
       evs.push({ t: c * TPS, on: true, midi, vel });

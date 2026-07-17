@@ -115,6 +115,16 @@ function scoreContrast(song) { // 段落節奏對比
 }
 
 function scoreGroove(song) { // 鼓與貝斯是否互補（反拍互鎖）
+  if (song.drumless) {
+    // 無鼓編曲：律動由反拍和聲刺/琶音承擔，不罰沒有大鼓（否則永遠選不上）
+    let offbeat = 0, n = 0;
+    for (const [k, v] of Object.entries(song.notes)) {
+      if (v !== 'harm') continue;
+      n++;
+      if ([2, 6].includes(+k.split(',')[1] % 8)) offbeat++;
+    }
+    return n ? Math.min(1, 0.55 + (offbeat / n) * 0.4) : 0.4;
+  }
   let kick = 0, offbeatBass = 0, bassN = 0;
   for (const [k, v] of Object.entries(song.drums)) if (k.startsWith('0,') && v) kick++;
   for (const [k, v] of Object.entries(song.notes)) {

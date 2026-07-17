@@ -10,6 +10,7 @@ export const THEMES = {
   },
   sad: {
     label: '離別之淚', icon: '☂', bpm: [76, 102], scale: [0, 2, 4, 5, 7, 9, 11],
+    tones: ['fm', 'piano', '25%', 'bell'],
     progs: [['Am', 'F', 'C', 'G'], ['Am', 'Dm', 'G', 'Am'], ['Am', 'F', 'Em', 'Am'], ['F', 'G', 'Em', 'Am']],
     rhythms: [[0], [0, 4], [0, 6], [0, 4, 6], [0, 3, 6], [0, 2, 4, 6]],
     bassPat: [[0, 'r'], [4, '5']],
@@ -20,14 +21,14 @@ export const THEMES = {
     progs: [['Am', 'Am', 'F', 'E'], ['Am', 'G', 'F', 'E'], ['Am', 'F', 'G', 'Am'], ['Dm', 'Am', 'E', 'Am']],
     rhythms: [[0, 4], [0, 2, 4, 6], [0, 1, 2, 4, 6], [0, 2, 3, 4, 6, 7], [0, 2, 4, 5, 6, 7]],
     bassPat: [[0, 'r'], [2, 'r'], [4, '5'], [6, 'r'], [7, '5']],
-    drums: { kick: [0, 6, 8, 14], snare: [4, 12] }, fill: true, minor: true
+    drums: { kick: [0, 6, 8, 14], snare: [4, 12] }, fill: true, minor: true, arp: true
   },
   lastboss: {
     label: '最終魔王', icon: '☠', bpm: [162, 192], scale: [9, 11, 0, 2, 4, 5, 8],
     progs: [['Am', 'Bb', 'Am', 'E'], ['Am', 'G', 'Bb', 'E'], ['Dm', 'Bb', 'E', 'Am'], ['Am', 'Bb', 'G', 'E']],
     rhythms: [[0, 2, 4, 6], [0, 1, 2, 4, 6], [0, 2, 3, 4, 6, 7], [0, 1, 2, 4, 5, 6, 7]],
     bassPat: [[0, 'r'], [1, 'r'], [2, 'r'], [3, 'r'], [4, '5'], [5, 'r'], [6, 'r'], [7, '5']],
-    drums: { kick: [0, 4, 8, 12], snare: [4, 12] }, fill: true, minor: true, keepClash: true
+    drums: { kick: [0, 4, 8, 12], snare: [4, 12] }, fill: true, minor: true, keepClash: true, arp: true
   },
   temple: {
     label: '古老神殿', icon: '⛩', bpm: [84, 110], scale: [9, 11, 0, 2, 4, 6, 7],
@@ -59,6 +60,7 @@ export const THEMES = {
   },
   wafu: {
     label: '和風庭園', icon: '❀', bpm: [96, 126], scale: [0, 2, 4, 7, 9],
+    tones: ['pluck', 'pluck', '25%'],
     progs: [['Am', 'G', 'Am', 'Em'], ['Am', 'Em', 'G', 'Am'], ['C', 'G', 'Am', 'Am']],
     rhythms: [[0, 4], [0, 3, 6], [0, 4, 6], [0, 2, 4], [0, 4, 5]],
     bassPat: [[0, 'r'], [6, '5']],
@@ -76,7 +78,7 @@ export const THEMES = {
     progs: [['Am', 'G', 'Am', 'G'], ['Am', 'C', 'G', 'Am'], ['Dm', 'Am', 'G', 'Am']],
     rhythms: [[0, 2, 4, 6], [0, 1, 2, 4, 6], [0, 2, 4, 5, 6], [0, 2, 3, 4, 6, 7]],
     bassPat: [[0, 'r'], [1, 'o'], [2, 'r'], [4, '5'], [5, 'o'], [6, 'r']],
-    drums: { kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true
+    drums: { kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true, arp: true
   },
   beach: {
     label: '碧海沙灘', icon: '~', bpm: [112, 138], scale: [0, 2, 4, 5, 7, 9, 11],
@@ -118,14 +120,14 @@ export const THEMES = {
     progs: [['Am', 'F', 'C', 'G'], ['Am', 'C', 'F', 'G'], ['Am', 'G', 'F', 'F']],
     rhythms: [[0, 2, 4, 6], [0, 3, 4, 7], [0, 2, 4, 6, 7], [0, 1, 4, 5], [0, 3, 6, 7]],
     bassPat: [[0, 'r'], [2, 'o'], [4, 'r'], [6, 'o']],
-    drums: { kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true
+    drums: { kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true, arp: true
   },
   arcade: {
     label: '街機對戰', icon: '◎', bpm: [150, 178], scale: [0, 2, 4, 5, 7, 9, 10],
     progs: [['C', 'Bb', 'F', 'C'], ['C', 'F', 'Bb', 'G'], ['C', 'G', 'Bb', 'F']],
     rhythms: [[0, 2, 4, 6], [0, 1, 2, 4, 6], [0, 2, 4, 5, 6], [0, 2, 3, 4, 6, 7]],
     bassPat: [[0, 'r'], [2, 'o'], [4, '5'], [6, 'o']],
-    drums: { kick: [0, 6, 8, 14], snare: [4, 12], hat: [2, 10] }, fill: true
+    drums: { kick: [0, 6, 8, 14], snare: [4, 12], hat: [2, 10] }, fill: true, arp: true
   },
   forest: {
     label: '神秘森林', icon: '♠', bpm: [90, 118], scale: [9, 11, 0, 2, 4, 6, 7],
@@ -167,7 +169,7 @@ export const THEMES = {
     progs: [['C', 'Am', 'C', 'G'], ['C', 'F', 'G', 'C'], ['Am', 'C', 'G', 'C']],
     rhythms: [[0, 2, 3, 4], [0, 2, 4, 6], [0, 1, 2, 4, 6], [0, 2, 3, 4, 6]],
     bassPat: [[0, 'r'], [2, '5'], [4, 'r'], [6, '5']],
-    drums: { kick: [0, 4, 8, 12], snare: [4, 10, 12], hat: [2, 6, 14] }, fill: true
+    drums: { kick: [0, 4, 8, 12], snare: [4, 10, 12], hat: [2, 6, 14] }, fill: true, arp: true
   },
   rainynight: {
     label: '雨夜咖啡', icon: '☕', bpm: [72, 96], scale: [0, 2, 4, 5, 7, 9, 11],
@@ -175,7 +177,7 @@ export const THEMES = {
     progs: [['Cmaj7', 'Am7', 'Dm7', 'G7'], ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7'], ['Am7', 'Dm7', 'G7', 'Cmaj7']],
     rhythms: [[0, 3], [0, 4, 7], [0, 3, 6], [0, 2, 5], [0, 4]],
     bassPat: [[0, 'r'], [4, '5'], [7, '3']],
-    drums: { kick: [0, 10], snare: [8], hat: [4, 12] }, fill: false
+    drums: { kick: [0, 10], snare: [8], hat: [4, 12] }, fill: false, swing: true
   },
   // ===== 大自然（追加）=====
   swamp: {
@@ -264,7 +266,7 @@ export const THEMES = {
     progs: [['C7', 'F7', 'C7', 'G7'], ['C7', 'A7', 'Dm7', 'G7'], ['F7', 'C7', 'G7', 'C7']],
     rhythms: [[0, 3, 4], [0, 2, 3, 6], [0, 3, 6, 7], [0, 1, 4, 5]],
     bassPat: [[0, 'r'], [2, '3'], [4, '5'], [6, '3']],
-    drums: { kick: [0, 8], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, keepClash: true
+    drums: { kick: [0, 8], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, keepClash: true, swing: true
   },
   prison: {
     label: '監獄深處', icon: '▩', bpm: [76, 96], scale: [9, 10, 0, 2, 4, 5, 7],
@@ -279,7 +281,7 @@ export const THEMES = {
     progs: [['C', 'F', 'G', 'C'], ['C', 'Bb', 'F', 'C'], ['G', 'C', 'F', 'G']],
     rhythms: [[0, 3, 4], [0, 2, 3, 6], [0, 3, 4, 6], [0, 2, 4, 6]],
     bassPat: [[0, 'r'], [3, '5'], [4, 'r'], [6, '5']],
-    drums: { kick: [0, 6, 8], snare: [4, 12] }, fill: true
+    drums: { kick: [0, 6, 8], snare: [4, 12] }, fill: true, swing: true
   },
   ballroom: {
     label: '城堡舞會', icon: '❦', bpm: [100, 126], scale: [0, 2, 4, 5, 7, 9, 11],
@@ -298,7 +300,7 @@ export const THEMES = {
   },
   musicbox: {
     label: '音樂盒回憶', icon: '♩', bpm: [66, 88], scale: [0, 2, 4, 5, 7, 9, 11],
-    tone: { lead: 'piano' },
+    tones: ['bell', 'bell', 'piano'],
     progs: [['C', 'Am', 'F', 'G'], ['Am', 'F', 'C', 'G'], ['C', 'Em', 'Am', 'F']],
     rhythms: [[0, 4], [0, 3, 6], [0, 6], [0, 2, 4]],
     bassPat: [[0, 'r'], [6, 'o']],
@@ -317,7 +319,7 @@ export const THEMES = {
     progs: [['Am', 'G', 'F', 'G'], ['Am', 'F', 'C', 'G'], ['Am', 'C', 'G', 'Em']],
     rhythms: [[0, 2, 4, 6], [0, 1, 2, 4, 6], [0, 2, 4, 5, 6], [0, 3, 4, 7]],
     bassPat: [[0, 'r'], [1, 'o'], [2, 'r'], [4, 'r'], [5, 'o'], [6, 'r']],
-    drums: { kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true
+    drums: { kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true, arp: true
   },
   alien: {
     label: '異星荒原', icon: '❉', bpm: [84, 110], scale: [0, 2, 4, 6, 8, 10],
@@ -376,7 +378,7 @@ export const THEMES = {
     progs: [['Am', 'F', 'E', 'Am'], ['Am', 'C', 'F', 'E'], ['Dm', 'Am', 'E', 'Am']],
     rhythms: [[0, 2, 4, 6], [0, 1, 2, 4, 6], [0, 2, 3, 4, 6, 7], [0, 2, 4, 5, 6]],
     bassPat: [[0, 'r'], [2, 'r'], [4, '5'], [5, 'r'], [6, 'r']],
-    drums: { kick: [0, 6, 8, 14], snare: [4, 12], hat: [2, 10] }, fill: true, minor: true
+    drums: { kick: [0, 6, 8, 14], snare: [4, 12], hat: [2, 10] }, fill: true, minor: true, arp: true
   },
   fallenhero: {
     label: '墮落英雄', icon: '⚰', bpm: [140, 168], scale: [9, 11, 0, 2, 4, 5, 8],
@@ -390,7 +392,7 @@ export const THEMES = {
     progs: [['Am', 'Bb', 'Am', 'Gm'], ['Am', 'Gm', 'Bb', 'Am'], ['Am', 'Bb', 'E', 'Am']],
     rhythms: [[0, 1, 4, 5], [0, 2, 4, 6], [0, 1, 2, 4, 6], [0, 2, 4, 6, 7]],
     bassPat: [[0, 'r'], [1, 'r'], [2, 'r'], [4, 'r'], [5, 'r'], [6, 'r']],
-    drums: { kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true, keepClash: true
+    drums: { kick: [0, 4, 8, 12], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true, keepClash: true, arp: true
   },
   witch: {
     label: '魔女之舞', icon: '☽', bpm: [128, 156], scale: [9, 11, 0, 2, 4, 6, 8],
@@ -419,14 +421,14 @@ export const THEMES = {
     progs: [['F', 'G', 'Em', 'Am'], ['F', 'G', 'Am', 'Am'], ['Dm', 'G', 'Em', 'Am'], ['F', 'G', 'C', 'Am']],  // IV→V→iii→vi 王道進行
     rhythms: [[0, 2, 4, 6], [0, 2, 3, 4, 6], [0, 1, 2, 4, 6], [0, 2, 4, 5, 6, 7]],
     bassPat: [[0, 'r'], [2, 'r'], [4, '5'], [6, 'r'], [7, '5']],
-    drums: { kick: [0, 6, 8, 14], snare: [4, 12], hat: [2, 10] }, fill: true
+    drums: { kick: [0, 6, 8, 14], snare: [4, 12], hat: [2, 10] }, fill: true, arp: true
   },
   bonedance: {
     label: '骨頭之舞', icon: '☠', bpm: [140, 170], scale: [9, 11, 0, 2, 4, 5, 7],
     progs: [['Am', 'G', 'Am', 'E'], ['Am', 'C', 'G', 'E'], ['Am', 'Em', 'G', 'Am']],
     rhythms: [[0, 2, 3, 4], [0, 1, 2, 4], [0, 2, 4, 5], [0, 2, 3, 6], [0, 1, 4, 6]],
     bassPat: [[0, 'r'], [1, 'o'], [2, 'r'], [3, 'o'], [4, '5'], [5, 'o'], [6, 'r'], [7, 'o']],  // 八度彈跳＝主角
-    drums: { kick: [0, 8], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true
+    drums: { kick: [0, 8], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: true, minor: true, arp: true
   },
   bonds: {
     label: '羈絆之歌', icon: '❤', bpm: [72, 96], scale: [0, 2, 4, 5, 7, 9, 11],
@@ -508,7 +510,7 @@ export const THEMES = {
     progs: [['Cmaj7', 'Am7', 'Dm7', 'G7'], ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7'], ['Cmaj7', 'A7', 'Dm7', 'G7']],
     rhythms: [[0, 3, 4], [0, 2, 4, 7], [0, 3, 6], [0, 3, 4, 6]],
     bassPat: [[0, 'r'], [3, '5'], [4, 'r'], [7, '3']],
-    drums: { kick: [0, 8], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: false
+    drums: { kick: [0, 8], snare: [4, 12], hat: [2, 6, 10, 14] }, fill: false, swing: true
   },
   subway: {
     label: '地鐵', icon: '▬', bpm: [120, 142], scale: [9, 11, 0, 2, 4, 5, 7],
@@ -581,7 +583,7 @@ export const THEMES = {
     progs: [['C', 'F', 'C', 'G'], ['C', 'Am', 'F', 'G'], ['F', 'C', 'Dm', 'G']],
     rhythms: [[0, 4], [0, 3, 6], [0, 2, 4], [0, 4, 6]],
     bassPat: [[0, 'r'], [4, '5'], [6, 'r']],
-    drums: { kick: [0, 8], snare: [12], hat: [4] }, fill: false
+    drums: { kick: [0, 8], snare: [12], hat: [4] }, fill: false, swing: true
   },
   florist: {
     label: '花店', icon: '❃', bpm: [96, 118], scale: [0, 2, 4, 5, 7, 9, 11],
@@ -634,7 +636,7 @@ export const THEMES = {
   },
   chapel: {
     label: '村莊教堂', icon: '✟', bpm: [66, 88], scale: [0, 2, 4, 5, 7, 9, 11],
-    tone: { lead: 'piano' },
+    tones: ['organ', 'organ', 'piano', 'bell'],
     progs: [['C', 'F', 'C', 'G'], ['C', 'Am', 'F', 'G'], ['F', 'C', 'G', 'C']],
     rhythms: [[0], [0, 4], [0, 4, 6], [0, 6]],
     bassPat: [[0, 'r'], [4, '5']],
@@ -681,7 +683,7 @@ export const THEMES = {
     progs: [['C', 'G', 'F', 'C'], ['C', 'F', 'G', 'C'], ['Am', 'F', 'C', 'G']],
     rhythms: [[0, 4], [0, 4, 6], [0, 2, 4, 6], [0, 6]],
     bassPat: [[0, 'r'], [4, '5'], [6, 'o']],
-    drums: { kick: [0, 8], snare: [12], hat: [4] }, fill: false
+    drums: { kick: [0, 8], snare: [12], hat: [4] }, fill: false, tones: ['bell', 'bell', '25%']
   },
   clinic: {
     label: '醫務室', icon: '✚', bpm: [70, 92], scale: [0, 2, 4, 5, 7, 9, 11],
@@ -981,14 +983,14 @@ export const THEMES = {
     progs: [['Cmaj7', 'Am7', 'Dm7', 'G7'], ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7'], ['Cmaj7', 'A7', 'Dm7', 'G7']],
     rhythms: [[0, 4], [0, 3, 6], [0, 6], [0, 3]],
     bassPat: [[0, 'r'], [4, '5'], [7, '3']],
-    drums: { kick: [0, 10], snare: [8], hat: [4, 12] }, fill: false
+    drums: { kick: [0, 10], snare: [8], hat: [4, 12] }, fill: false, swing: true
   },
   catday: {
     label: '貓咪日常', icon: '◕', bpm: [84, 106], scale: [0, 2, 4, 5, 7, 9, 11],
     progs: [['C', 'Am', 'F', 'G'], ['C', 'F', 'Dm', 'G'], ['F', 'G', 'C', 'Am']],
     rhythms: [[0, 4], [0, 3, 6], [0, 2, 4], [0, 4, 6]],
     bassPat: [[0, 'r'], [4, '5'], [6, 'r']],
-    drums: { kick: [0, 8], snare: [12], hat: [4, 12] }, fill: false
+    drums: { kick: [0, 8], snare: [12], hat: [4, 12] }, fill: false, swing: true
   },
   fishingtime: {
     label: '釣魚時光', icon: '⟢', bpm: [68, 90], scale: [0, 2, 4, 5, 7, 9, 11],
@@ -1004,7 +1006,7 @@ export const THEMES = {
     progs: [['C', 'G', 'Am', 'F'], ['C', 'Em', 'F', 'G'], ['F', 'G', 'C', 'Am']],
     rhythms: [[0, 4], [0, 3, 6], [0, 6], [0, 4, 6]],
     bassPat: [[0, 'r'], [4, '5'], [6, 'o']],
-    drums: { kick: [0, 8], snare: [], hat: [4, 12] }, fill: false
+    drums: { kick: [0, 8], snare: [], hat: [4, 12] }, fill: false, swing: true
   },
   stroll: {
     label: '悠閒散步', icon: '↝', bpm: [96, 118], scale: [0, 2, 4, 5, 7, 9, 11],
@@ -1027,7 +1029,7 @@ export const THEMES = {
     progs: [['Cmaj7', 'Am7', 'Dm7', 'G7'], ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7'], ['Am7', 'Dm7', 'G7', 'Cmaj7']],
     rhythms: [[0, 3], [0, 4, 7], [0, 3, 6], [0, 4]],
     bassPat: [[0, 'r'], [4, '5'], [7, '3']],
-    drums: { kick: [0, 10], snare: [8], hat: [4, 12] }, fill: false
+    drums: { kick: [0, 10], snare: [8], hat: [4, 12] }, fill: false, swing: true
   },
   bedtime: {
     label: '睡前時光', icon: '⚝', bpm: [58, 78], scale: [0, 2, 4, 5, 7, 9, 11],

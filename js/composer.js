@@ -1,8 +1,25 @@
 // 作曲引擎：段落規劃 → 和弦 → 旋律/和聲/貝斯/鼓 → 修復通道
 // 精神繼承 EASY 8BIT EDITOR 的 生成→修復 思路，全部重新實作
-import { CHORDS, SUB_DARK, SUB_BRIGHT, Rng, pc, midiToRow, rowToMidi, isChordTone, nearestChordTone, scaleWalk, chordAwareScale, SEG } from './theory.js';
-import { THEMES, planSections } from './themes.js';
+import { CHORDS, SUB_DARK, SUB_BRIGHT, SEC_DOM, Rng, pc, midiToRow, rowToMidi, isChordTone, nearestChordTone, scaleWalk, chordAwareScale, SEG } from './theory.js';
+import { THEMES, planSections, CATEGORIES } from './themes.js';
 import { emptySong } from './state.js';
+
+// ---- 主奏音色池：依主題分類抽，同主題不同 seed 會拿到不同樂器 ----
+// 名義上是 8bit，實際目標是「復古遊戲感」——泰拉瑞亞/Undertale 都不是純方波
+const THEME_CAT = {};
+for (const c of CATEGORIES) for (const t of c.themes) THEME_CAT[t] = c.id;
+const TONE_POOLS = {
+  nature:   ['25%', 'pluck', 'pluck', '50%'],
+  city:     ['fm', 'saw', '25%', 'fm'],
+  village:  ['pluck', '25%', 'fm', 'pluck'],
+  facility: ['bell', 'organ', '25%', 'fm'],
+  indoor:   ['fm', 'bell', 'piano', '25%'],
+  scifi:    ['saw', 'saw', '25%', 'fm'],
+  rpg:      ['25%', '50%', 'pluck', '25%'],
+  legend:   ['fm', 'bell', '25%', 'piano'],
+  casual:   ['pluck', 'bell', 'fm', '25%'],
+  boss:     ['50%', 'saw', '25%', '50%'],
+};
 
 const LEAD_LO = 64, LEAD_HI = 83;
 const HARM_LO = 60, HARM_HI = 76;
@@ -21,9 +38,22 @@ export function composeSong({ theme, steps, gen, seed }) {
   song.theme = theme;
   song.seed = seed;
   song.chords = [];
+  song.transpose = rng.rint(-5, 6); // 整曲移調（播放時套用，音格仍以 C 調記譜）
+  song.swing = !!T.swing;           // 主題級搖擺（scheduler 播放時套用）
+
+  // 主奏音色：主題自訂池 > 主題固定 tone > 分類池（套用時機在 main.js/auto.js 同步進 mixer）
+  const tonePool = T.tones || (T.tone && T.tone.lead ? [T.tone.lead] : TONE_POOLS[THEME_CAT[theme]] || null);
+  if (tonePool) song.tone = { lead: rng.pick(tonePool) };
 
   const sections = planSections(bars, gen.form, rng);
   song.secTags = sections;
+
+  // ---- 無鼓編曲：抒情/氛圍系主題有機率整首不用鼓組（Undertale 抒情曲手法）----
+  // 律動改由貝斯 + 反拍和聲刺（oom-pah）+ 琶音承擔。主題可設 drumless:true 強制 / false 禁用
+  const drumlessOk = T.drumless === true ||
+    (T.drumless !== false && T.fill === false && !T.jingle && (T.bpm[0] + T.bpm[1]) / 2 <= 115);
+  const drumless = drumlessOk && (T.drumless === true || rng.chance(0.4));
+  if (drumless) song.drumless = true;
 
   // ---- 和弦 ----
   const progCache = {};
@@ -47,6 +77,17 @@ export function composeSong({ theme, steps, gen, seed }) {
       song.chords.push(moodChord(prog[i % prog.length], isLast));
     }
   });
+
+  // ---- 次屬和弦：小節後半有機率換成「下一個和弦的 V7」做推進 ----
+  // 調式色彩和弦（bII/bIII/借用小屬）是主題的身分證，不可替換——
+  // 換掉 dragon/abyss 的 Bb 會讓黑暗氛圍整個出戲（用戶聽感實證）
+  const MODAL_COLOR = new Set(['Bb', 'Eb', 'Gm', 'Bdim']);
+  for (let i = 1; i < song.chords.length - 1; i += 2) {
+    const curC = song.chords[i], next = song.chords[i + 1];
+    const dom = SEC_DOM[next];
+    if (!dom || dom === curC || next === curC || MODAL_COLOR.has(curC)) continue;
+    if (rng.chance(0.10 + dr * 0.18)) song.chords[i] = dom;
+  }
 
   // ---- 旋律 ----
   const pcsAt = seg => CHORDS[song.chords[seg]] || [0, 4, 7];
@@ -75,7 +116,7 @@ export function composeSong({ theme, steps, gen, seed }) {
     return midi;
   };
 
-  const writeSegment = (secKind, secStart, sg, motif, energy, forceMotif = false) => {
+  const writeSegment = (secKind, secStart, sg, motif, energy, forceMotif = false, opts = {}) => {
     const seg = (secStart + sg * SEG) / SEG;
     const pcs = pcsAt(seg);
     const scale = chordAwareScale(T.scale, pcs, T.keepClash);
@@ -87,6 +128,11 @@ export function composeSong({ theme, steps, gen, seed }) {
     } else {
       rhythm = pickRhythm(energy);
       if (sg === 0 && !rhythm.includes(0)) rhythm = [0, ...rhythm];
+    }
+    // 樂句結尾：修掉尾巴的起音，讓句子呼吸（終止音會延長蓋過空拍）
+    if (opts.restTail) {
+      const trimmed = rhythm.filter(o => o < SEG - opts.restTail);
+      rhythm = trimmed.length ? trimmed : [0];
     }
     const placed = [];
     rhythm.forEach((off, i) => {
@@ -105,10 +151,16 @@ export function composeSong({ theme, steps, gen, seed }) {
       if (Math.abs(midi - cur) > maxLeap && placed.length) {
         midi = scaleWalk(cur, scale, midi > cur ? 1 : -1, LEAD_LO, LEAD_HI);
       }
+      // 問答終止式：句尾落在指定音（問句→五度懸置、答句→根音解決）
+      if (opts.cadence && i === rhythm.length - 1 && pcs.length) {
+        const tPc = opts.cadence === 'root' ? pcs[0] : (pcs[0] + 7) % 12;
+        midi = nearestChordTone(cur, [tPc], LEAD_LO, LEAD_HI);
+      }
       const nextOff = rhythm[i + 1] ?? SEG;
       let gap = nextOff - off;
       let span = energy > 0.6 ? gap : Math.max(1, Math.round(gap * 0.6));
       if (T.fill === false) span = gap; // 抒情主題用連音
+      if (opts.restTail && i === rhythm.length - 1) span = gap; // 終止音唱好唱滿
       cur = placeLead(c, midi, Math.min(span, gap), strong && rng.chance(0.3) ? 2 : 1);
       placed.push({ off, midi });
     });
@@ -143,7 +195,9 @@ export function composeSong({ theme, steps, gen, seed }) {
             if (idx >= 0) leadOnsets.splice(idx, 1);
           }
         }
-        writeSegment(sec.kind, secStart, sg, null, energy);
+        const isLast = sg === segs - 1;
+        writeSegment(sec.kind, secStart, sg, null, energy, false,
+          isLast ? { cadence: 'root', restTail: 3 } : {});
       }
       return;
     }
@@ -153,18 +207,38 @@ export function composeSong({ theme, steps, gen, seed }) {
     // 雷特動機：使用者記住的動機強制開場（A/S 段第一段，B 段偶爾）
     const ext = gen.motif && gen.motif.rhythm && gen.motif.rhythm.length >= 2;
     const useExtHere = ext && (sec.kind === 'A' || sec.kind === 'S' || (sec.kind === 'B' && rng.chance(0.4)));
+    // 樂句問答：每 2 小節（4 段）為一句，問句尾懸在五度、答句尾解決到根音；
+    // 答句重用問句的節奏與輪廓，只換終止 —— 這是「像人寫的」關鍵
+    const phraseSegs = Math.min(4, segs);
+    let qMotifs = [];
     for (let sg = 0; sg < segs; sg++) {
+      const pos = sg % phraseSegs;
+      const phraseIdx = Math.floor(sg / phraseSegs);
+      const isAnswer = phraseIdx % 2 === 1;
+      const isPhraseEnd = pos === phraseSegs - 1;
+      const isSectionEnd = sg === segs - 1;
+      const opts = isPhraseEnd
+        ? { cadence: (isAnswer || isSectionEnd) ? 'root' : 'fifth', restTail: 3 }
+        : {};
       if (sg === 0 && useExtHere) {
         const extMotif = { rhythm: gen.motif.rhythm, contour: gen.motif.contour, base: centerOf[sec.kind] || 71 };
-        motif = writeSegment(sec.kind, secStart, 0, extMotif, energy, true);
+        motif = writeSegment(sec.kind, secStart, 0, extMotif, energy, true, opts);
+        qMotifs[0] = motif;
         continue;
       }
-      // ゼクエンツ／フック：偶數段有機率變成前段動機的移調重現
-      const useMotif = motif && (
-        (gen.sequenz && sg % 2 === 1 && rng.chance(0.55)) ||
-        (sg >= 2 && sg % 2 === 0 && rng.chance(hk * 0.6))
-      );
-      const m = writeSegment(sec.kind, secStart, sg, useMotif ? motif : null, energy);
+      let use = null, force = false;
+      if (isAnswer && qMotifs[pos] && rng.chance(0.5 + hk * 0.45)) {
+        use = qMotifs[pos]; force = true; // 答句重用問句動機
+      } else {
+        // ゼクエンツ／フック：偶數段有機率變成前段動機的移調重現
+        const useMotif = motif && (
+          (gen.sequenz && sg % 2 === 1 && rng.chance(0.55)) ||
+          (sg >= 2 && sg % 2 === 0 && rng.chance(hk * 0.6))
+        );
+        if (useMotif) use = motif;
+      }
+      const m = writeSegment(sec.kind, secStart, sg, use, energy, force, opts);
+      if (!isAnswer) qMotifs[pos] = m;
       if (sg === 0) motif = m;
     }
     if (capture && sec.kind === 'A' && !storedA) {
@@ -197,11 +271,20 @@ export function composeSong({ theme, steps, gen, seed }) {
     leadOnsets.push({ c: peakC, midi: peak, key });
   }
 
+  // ---- 織體規劃：intro 段減薄、琶音段挑選 ----
+  const introSec = (sections.length >= 4 && sections[0].kind !== 'C' && !T.jingle) ? sections[0] : null;
+  // 無鼓時琶音也開放給抒情主題——穩定琶音就是「音高化的踏鈸」
+  const arpOk = T.arp === true || ((T.fill !== false || drumless) && rng.chance(0.35 + d * 0.45));
+  const arpSecs = new Set(
+    arpOk ? sections.filter(s => (s.kind === 'S' || s.kind === 'B') && s !== introSec) : []
+  );
+
   // ---- 和聲（ハモリ）----
   const sorted = [...leadOnsets].sort((a, b) => a.c - b.c);
   sorted.forEach(o => {
     const seg = Math.floor(o.c / SEG);
     const sec = sections.find(s => o.c >= s.startBar * 16 && o.c < (s.startBar + s.bars) * 16);
+    if (drumless || !sec || sec === introSec || arpSecs.has(sec)) return; // intro 留白、琶音段交給琶音、無鼓時改用反拍刺
     const energy = { A: 0.35, A2: 0.4, B: 0.5, S: 0.75, C: 0.2 }[sec?.kind] ?? 0.4;
     if (o.c % 4 !== 0 || !rng.chance(d * 0.5 + energy * 0.45)) return;
     const pcs = pcsAt(seg);
@@ -212,6 +295,43 @@ export function composeSong({ theme, steps, gen, seed }) {
     const leadSpan = song.spans[o.key] || 1;
     if (leadSpan > 1) song.spans[key] = leadSpan;
   });
+
+  // ---- 琶音（分解和弦）：chiptune 招牌織體，副歌/橋段鋪 8 分或 16 分上行循環 ----
+  const arpInt = rD > 0.55 ? 2 : 4;
+  for (const sec of arpSecs) {
+    const start = sec.startBar * 16, end = start + sec.bars * 16;
+    let idx = 0;
+    for (let c = start; c < end; c += arpInt) {
+      if (c % SEG === 0) idx = 0; // 每半小節從和弦底音重新起跑
+      const pcs = pcsAt(Math.floor(c / SEG));
+      if (!pcs.length) continue;
+      const tones = [];
+      for (let m = HARM_LO; m <= HARM_HI; m++) if (pcs.includes(pc(m))) tones.push(m);
+      if (!tones.length) continue;
+      const midi = tones[idx % tones.length];
+      idx++;
+      const key = midiToRow(midi) + ',' + c;
+      if (!song.notes[key]) song.notes[key] = 'harm';
+    }
+  }
+
+  // ---- 無鼓編曲：反拍和聲刺（oom-pah）扛起律動，取代長音和聲 ----
+  if (drumless) {
+    sections.forEach(sec => {
+      if (sec === introSec || arpSecs.has(sec)) return;
+      const start = sec.startBar * 16, end = start + sec.bars * 16;
+      const sparse = sec.kind === 'C'; // 間奏刺一半就好
+      for (let c = start + 2; c < end; c += 4) { // 落在每拍反拍（seg 內 2、6）
+        if (sparse && c % SEG !== 2) continue;
+        if (!rng.chance(0.9)) continue;
+        const pcs = pcsAt(Math.floor(c / SEG));
+        if (!pcs.length) continue;
+        const tone = nearestChordTone(67, pcs, HARM_LO, HARM_HI);
+        const key = midiToRow(tone) + ',' + c;
+        if (!song.notes[key]) song.notes[key] = 'harm';
+      }
+    });
+  }
 
   // ---- 貝斯 ----
   const bassify = (pat) => {
@@ -247,15 +367,39 @@ export function composeSong({ theme, steps, gen, seed }) {
       const nextOff = pat.find(q => q[0] > off)?.[0] ?? SEG;
       placeBass(song, seg * SEG + off, p, Math.max(1, Math.round((nextOff - off) * 0.9)), kind === 'o');
     });
+    // 導音：換和弦前最後一步，貼著下一個根音的實際音高走半音進去
+    // （不能用音類尋位——導音 B→C 會被找到高八度去，變成突兀的高音）
+    const nextPcs = pcsAt(seg + 1);
+    if (seg < totalSegs - 1 && nextPcs.length && nextPcs[0] !== root && rng.chance(rD * 0.35)) {
+      const c7 = seg * SEG + 7;
+      let target = BASS_LO; // 下一個根音實際會落的位置（與 placeBass 同邏輯）
+      while (pc(target) !== nextPcs[0] && target <= BASS_HI) target++;
+      let app = target - 1;
+      if (app < BASS_LO) app = target + 1; // 低半音超出音域就改從上方走下來
+      // 該步已有貝斯起音就放棄；前面延音蓋過來就剪短，確保單音線條
+      let occupied = false;
+      for (const [k, v] of Object.entries(song.notes)) {
+        if (v !== 'bass') continue;
+        const [r, c] = k.split(',').map(Number);
+        if (c === c7) { occupied = true; break; }
+        if (c < c7 && c >= seg * SEG && c + (song.spans[k] || 1) > c7) song.spans[k] = c7 - c;
+      }
+      if (!occupied) {
+        const key = midiToRow(app) + ',' + c7;
+        if (!song.notes[key]) song.notes[key] = 'bass';
+      }
+    }
   }
 
-  // ---- 鼓 ----
+  // ---- 鼓 ----（無鼓編曲整組跳過）
   const hatPat = rD < 0.25 ? [0, 8] : rD < 0.5 ? [0, 4, 8, 12] : rD < 0.8 ? [0, 2, 4, 6, 8, 10, 12, 14] : [0, 2, 4, 6, 8, 10, 12, 14];
-  sections.forEach(sec => {
+  if (!drumless) sections.forEach(sec => {
     const start = sec.startBar * 16, end = start + sec.bars * 16;
     const quiet = sec.kind === 'C';
+    const thinBars = sec === introSec ? Math.ceil(sec.bars / 2) : 0; // intro 前半：鼓只留踏鈸
     for (let bar = 0; bar < sec.bars; bar++) {
       const b0 = start + bar * 16;
+      if (bar < thinBars) { song.drums['2,' + b0] = 1; song.drums['2,' + (b0 + 8)] = 1; continue; }
       if (quiet && bar < sec.bars - 1) { song.drums['2,' + b0] = 1; song.drums['2,' + (b0 + 8)] = 1; continue; }
       (T.drums.kick || []).forEach(o => song.drums['0,' + (b0 + o)] = 1);
       (T.drums.snare || []).forEach(o => song.drums['1,' + (b0 + o)] = 1);
@@ -408,6 +552,7 @@ export function nightVariant(day) {
   const rng = new Rng(String(day.seed || 'seed') + '|night');
   song.bpm = Math.max(60, Math.round(day.bpm * 0.78));
   song.seed = (day.seed || '—') + '·夜';
+  song.tone = { ...(song.tone || {}), lead: 'piano' }; // 夜版統一鋼琴「回憶版」質感
 
   const steps = song.steps;
 

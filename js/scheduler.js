@@ -3,18 +3,19 @@ import { rowToMidi, ROWS } from './theory.js';
 
 // 把某一步的所有音符排入合成器（即時與離線渲染共用）
 export function scheduleStep(synth, song, mixer, step, time, sd) {
-  if (mixer.swing && step % 2 === 1) time += sd * 0.28;
+  if ((mixer.swing || song.swing) && step % 2 === 1) time += sd * 0.28;
   const gate = 0.92;
   const halves = song.halves || {};
+  const tr = song.transpose || 0; // 整曲移調（噪音通道除外，避免打擊音色跑掉）
   for (let r = 0; r < ROWS; r++) {
     const key = r + ',' + step;
     const inst = song.notes[key];
     if (!inst) continue;
     const span = song.spans[key] || 1;
     const vel = [0.6, 1, 1.35][(song.vels[key] || 1) - 1] || 1;
-    const midi = rowToMidi(r);
+    const midi = rowToMidi(r) + (inst === 'noise' ? 0 : tr);
     let glide;
-    if (song.slides[key] !== undefined) glide = rowToMidi(song.slides[key]);
+    if (song.slides[key] !== undefined) glide = rowToMidi(song.slides[key]) + (inst === 'noise' ? 0 : tr);
     if (halves[key]) { // 連打：一格打兩個 32 分音符
       synth.playNote(inst, midi, time, sd * 0.45, vel, glide);
       synth.playNote(inst, midi, time + sd / 2, sd * 0.45, vel, glide);
@@ -95,7 +96,8 @@ export class Transport {
   preview(inst, midi) {
     const ctx = this.synth.ctx;
     if (ctx.state === 'suspended') ctx.resume();
-    this.synth.playNote(inst, midi, ctx.currentTime + 0.01, this.sd * 2, 1);
+    const tr = inst === 'noise' ? 0 : (this.store.song.transpose || 0);
+    this.synth.playNote(inst, midi + tr, ctx.currentTime + 0.01, this.sd * 2, 1);
   }
   previewDrum(lane) {
     const ctx = this.synth.ctx;

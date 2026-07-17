@@ -1,10 +1,19 @@
 @echo off
-chcp 65001 >nul
-title ChipForge 8BIT 音樂工坊
-echo.
-echo   ⚒ ChipForge 啟動中…
-echo   瀏覽器開啟 http://localhost:8213
-echo   （關閉此視窗即停止伺服器）
+title ChipForge 8BIT Music Workshop
+cd /d "%~dp0"
+
+echo Stopping previous ChipForge server (if any)...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8213" ^| findstr "LISTENING"') do taskkill /F /PID %%a >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+echo Starting ChipForge on http://localhost:8213 ...
+echo (Close this window to stop the server)
 echo.
 start "" http://localhost:8213
-python -m http.server 8213 --directory "%~dp0"
+python serve.py 8213
+
+if errorlevel 1 (
+  echo.
+  echo [ERROR] Server failed to start. See the message above.
+  pause
+)

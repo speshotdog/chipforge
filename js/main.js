@@ -23,6 +23,13 @@ async function boot() {
 
   const synth = await createLiveSynth(() => store.mixer);
   const transport = new Transport(synth, store);
+
+  // 曲子自帶主奏音色（song.tone）→ 同步進混音台
+  function syncSongTone() {
+    const t = store.song?.tone;
+    if (t) { store.mixer.duty = { ...store.mixer.duty, ...t }; synth.syncMixer(); store.save(); }
+  }
+  if (shared) syncSongTone();
   const rollScroll = $('rollScroll');
   const roll = new Roll($('roll'), store, transport, rollScroll);
   const mascot = new Mascot($('mascot'));
@@ -133,6 +140,7 @@ async function boot() {
     if (!s) return;
     transport.stop();
     store.applySong(JSON.parse(JSON.stringify(s.song)));
+    syncSongTone();
     bpmInput.value = store.song.bpm; bpmVal.textContent = store.song.bpm;
     synth.setBpm(store.song.bpm);
     clearDirty();
@@ -327,6 +335,7 @@ async function boot() {
     if (!c) return;
     const song = JSON.parse(JSON.stringify(c.song));
     store.applySong(song);
+    syncSongTone();
     bpmInput.value = song.bpm; bpmVal.textContent = song.bpm;
     synth.setBpm(song.bpm);
     document.querySelectorAll('.cand-chip').forEach((el, j) => el.classList.toggle('active', j === i));
@@ -406,6 +415,7 @@ async function boot() {
     savePair();
     const song = JSON.parse(JSON.stringify(pair[which]));
     store.applySong(song);
+    syncSongTone();
     bpmInput.value = song.bpm; bpmVal.textContent = song.bpm;
     synth.setBpm(song.bpm);
     renderPairChips();
@@ -471,7 +481,7 @@ async function boot() {
   $('btnLoad').onclick = () => $('fileInput').click();
   $('fileInput').onchange = e => {
     const f = e.target.files[0];
-    if (f) importJson(f, s => { store.applySong(s); });
+    if (f) importJson(f, s => { store.applySong(s); syncSongTone(); });
     e.target.value = '';
   };
   $('btnShare').onclick = async () => {
@@ -543,10 +553,10 @@ async function boot() {
     opts.className = 'mx-opts';
     opts.innerHTML = `
       <label>主旋律波形 <select data-k="dutyLead">
-        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option>
+        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option><option value="fm">FM 電鋼 ✨</option><option value="pluck">撥弦 🪕</option><option value="bell">音樂盒 🔔</option><option value="saw">鋸齒波 ⚡</option><option value="organ">管風琴 ⛪</option>
       </select></label>
       <label>和聲波形 <select data-k="dutyHarm">
-        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option>
+        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option><option value="fm">FM 電鋼 ✨</option><option value="pluck">撥弦 🪕</option><option value="bell">音樂盒 🔔</option><option value="saw">鋸齒波 ⚡</option><option value="organ">管風琴 ⛪</option>
       </select></label>
       <label>貝斯 <select data-k="bassWave">
         <option value="tri">三角波</option><option value="pulse">方波</option><option value="slap">擊弦</option>
