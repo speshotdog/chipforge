@@ -249,7 +249,8 @@ export const THEMES = {
   // ===== 特殊設施（追加）=====
   library: {
     label: '魔法圖書館', icon: '✎', bpm: [88, 110], scale: [0, 2, 4, 6, 7, 9, 11],
-    progs: [['C', 'D', 'Em', 'C'], ['Am', 'D', 'G', 'Em'], ['C', 'Em', 'D', 'G']],
+    // 進行全部以 C 開頭結尾：利底亞的神秘靠 D 和弦，「家」不能丟（聽感回報：聽不出主體）
+    progs: [['C', 'D', 'Em', 'C'], ['C', 'Em', 'D', 'C'], ['C', 'D', 'G', 'C']],
     rhythms: [[0, 4], [0, 3, 6], [0, 2, 6], [0, 5]],
     bassPat: [[0, 'r'], [6, 'o']],
     drums: { kick: [0, 8], snare: [], hat: [4, 12] }, fill: false

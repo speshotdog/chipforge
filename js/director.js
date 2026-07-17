@@ -115,6 +115,8 @@ function scoreContrast(song) { // 段落節奏對比
 }
 
 function scoreGroove(song) { // 鼓與貝斯是否互補（反拍互鎖）
+  // ostinato/solo 原型的律動來自紋理編舞，不以大鼓數評分
+  if (song.archetype && song.archetype !== 'groove') return 0.6;
   if (song.drumless) {
     // 無鼓編曲：律動由反拍和聲刺/琶音承擔，不罰沒有大鼓（否則永遠選不上）
     let offbeat = 0, n = 0;

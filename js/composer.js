@@ -25,6 +25,34 @@ const LEAD_LO = 64, LEAD_HI = 83;
 const HARM_LO = 60, HARM_HI = 76;
 const BASS_LO = 60, BASS_HI = 77;
 
+// ---- 編曲原型（Sharou 式編曲研究的結論：風格感＝聲部間共同的紋理原型）----
+// groove＝現狀（旋律+和聲+貝斯+鼓全員驅動，BOSS/電音的緊湊感來源）
+// ostinato＝一句固定伴奏音型全曲不變（身分錨），旋律稀疏地飄在上面（妖精之泉/2:23 AM）
+// solo＝主旋律獨大，伴奏退到極簡低音（抒情鋼琴曲）
+// 主題可設 archetype 欄位覆寫；未列名的主題一律 groove（行為不變）
+const ARCH_OSTINATO = new Set(['library', 'musicbox', 'firefly', 'starcradle', 'aurora', 'deepsea', 'snow', 'temple', 'portal', 'observatory']);
+const ARCH_SOLO = new Set(['memoryshard', 'sad', 'elegy', 'gentleend', 'bedtime', 'rainynight', 'lazynoon', 'slowcafe', 'daydream']);
+const archetypeOf = (theme, T) =>
+  T.archetype || (ARCH_OSTINATO.has(theme) ? 'ostinato' : ARCH_SOLO.has(theme) ? 'solo' : 'groove');
+
+// 紋理編舞：各段落哪些聲部在場（Sharou 式 layer in/out——結構＝紋理的變化）
+const LAYER_PLAN = {
+  ostinato: {
+    A:  { bass: 0, drums: 0, harm: 1 },
+    A2: { bass: 1, drums: 0, harm: 1 },
+    B:  { bass: 1, drums: 1, harm: 1 },
+    S:  { bass: 1, drums: 1, harm: 1 },
+    C:  { bass: 1, drums: 0, harm: 1 }, // 間奏拆到只剩伴奏句
+  },
+  solo: {
+    A:  { bass: 1, drums: 0, harm: 0 },
+    A2: { bass: 1, drums: 0, harm: 1 },
+    B:  { bass: 1, drums: 1, harm: 1 },
+    S:  { bass: 1, drums: 1, harm: 1 },
+    C:  { bass: 1, drums: 0, harm: 0 }, // 間奏回到獨奏
+  },
+};
+
 export function composeSong({ theme, steps, gen, seed }) {
   const T = THEMES[theme] || THEMES.bright;
   const rng = new Rng(seed);
@@ -48,17 +76,24 @@ export function composeSong({ theme, steps, gen, seed }) {
   const sections = planSections(bars, gen.form, rng);
   song.secTags = sections;
 
+  // 編曲原型與紋理編舞
+  const arch = archetypeOf(theme, T);
+  if (arch !== 'groove') song.archetype = arch;
+  const layerAt = sec => arch === 'groove' ? null : (LAYER_PLAN[arch][sec?.kind] || { bass: 1, drums: 1, harm: 1 });
+
   // ---- 無鼓編曲：抒情/氛圍系主題有機率整首不用鼓組（Undertale 抒情曲手法）----
   // 律動改由貝斯 + 反拍和聲刺（oom-pah）+ 琶音承擔。主題可設 drumless:true 強制 / false 禁用
   const drumlessOk = T.drumless === true ||
     (T.drumless !== false && T.fill === false && !T.jingle && (T.bpm[0] + T.bpm[1]) / 2 <= 115);
-  const drumless = drumlessOk && (T.drumless === true || rng.chance(0.4));
+  const drumlessP = arch === 'solo' ? 0.7 : arch === 'ostinato' ? 0.5 : 0.4;
+  const drumless = drumlessOk && (T.drumless === true || rng.chance(drumlessP));
   if (drumless) song.drumless = true;
 
   // ---- 和弦 ----
+  // 調性錨：ostinato/solo 原型鎖定單一進行全曲不換——氛圍曲的「家」不能漂
   const progCache = {};
   const progFor = (kind) => {
-    if (dr < 0.34) { progCache.all ||= rng.pick(T.progs); return progCache.all; }
+    if (arch !== 'groove' || dr < 0.34) { progCache.all ||= rng.pick(T.progs); return progCache.all; }
     if (dr < 0.67) { const g = kind === 'A2' ? 'A' : kind; progCache[g] ||= rng.pick(T.progs); return progCache[g]; }
     return rng.pick(T.progs);
   };
@@ -82,7 +117,7 @@ export function composeSong({ theme, steps, gen, seed }) {
   // 調式色彩和弦（bII/bIII/借用小屬）是主題的身分證，不可替換——
   // 換掉 dragon/abyss 的 Bb 會讓黑暗氛圍整個出戲（用戶聽感實證）
   const MODAL_COLOR = new Set(['Bb', 'Eb', 'Gm', 'Bdim']);
-  for (let i = 1; i < song.chords.length - 1; i += 2) {
+  if (arch === 'groove') for (let i = 1; i < song.chords.length - 1; i += 2) { // 氛圍原型不加次屬（調性錨優先）
     const curC = song.chords[i], next = song.chords[i + 1];
     const dom = SEC_DOM[next];
     if (!dom || dom === curC || next === curC || MODAL_COLOR.has(curC)) continue;
@@ -97,8 +132,9 @@ export function composeSong({ theme, steps, gen, seed }) {
   const leadOnsets = [];
 
   const pickRhythm = (energy) => {
-    // 依密度 + 段落能量挑節奏型（長度加權）
-    const want = Math.round(1 + (d * 0.7 + energy * 0.3) * (T.rhythms.reduce((m, r) => Math.max(m, r.length), 0) - 1));
+    // 依密度 + 段落能量挑節奏型（長度加權）；ostinato 原型旋律要稀疏（伴奏句才是主體）
+    const dEff = arch === 'ostinato' ? d * 0.5 : d;
+    const want = Math.round(1 + (dEff * 0.7 + energy * 0.3) * (T.rhythms.reduce((m, r) => Math.max(m, r.length), 0) - 1));
     const pool = T.rhythms.filter(r => Math.abs(r.length - want) <= 1);
     return rng.pick(pool.length ? pool : T.rhythms);
   };
@@ -273,17 +309,27 @@ export function composeSong({ theme, steps, gen, seed }) {
 
   // ---- 織體規劃：intro 段減薄、琶音段挑選 ----
   const introSec = (sections.length >= 4 && sections[0].kind !== 'C' && !T.jingle) ? sections[0] : null;
-  // 無鼓時琶音也開放給抒情主題——穩定琶音就是「音高化的踏鈸」
-  const arpOk = T.arp === true || ((T.fill !== false || drumless) && rng.chance(0.35 + d * 0.45));
+  // 無鼓時琶音也開放給抒情主題——穩定琶音就是「音高化的踏鈸」（ostinato/solo 原型不用泛用琶音）
+  const arpOk = arch === 'groove' && (T.arp === true || ((T.fill !== false || drumless) && rng.chance(0.35 + d * 0.45)));
   const arpSecs = new Set(
     arpOk ? sections.filter(s => (s.kind === 'S' || s.kind === 'B') && s !== introSec) : []
   );
 
   // ---- 和聲（ハモリ）----
   const sorted = [...leadOnsets].sort((a, b) => a.c - b.c);
-  sorted.forEach(o => {
+  if (arch !== 'ostinato') sorted.forEach(o => { // ostinato 的和聲通道整條讓給伴奏句
     const seg = Math.floor(o.c / SEG);
     const sec = sections.find(s => o.c >= s.startBar * 16 && o.c < (s.startBar + s.bars) * 16);
+    if (arch === 'solo') {
+      // solo 原型：極簡——只在半小節頭、低八度輕聲襯，讓主旋律獨大
+      if (!sec || !layerAt(sec).harm) return;
+      if (o.c % 8 !== 0 || !rng.chance(0.35)) return;
+      const pcs = pcsAt(seg);
+      const h = nearestChordTone(o.midi - rng.pick([7, 9, 12]), pcs, HARM_LO, Math.min(66, o.midi - 5));
+      const key = midiToRow(h) + ',' + o.c;
+      if (!song.notes[key]) { song.notes[key] = 'harm'; song.spans[key] = Math.min(8, SEG); }
+      return;
+    }
     if (drumless || !sec || sec === introSec || arpSecs.has(sec)) return; // intro 留白、琶音段交給琶音、無鼓時改用反拍刺
     const energy = { A: 0.35, A2: 0.4, B: 0.5, S: 0.75, C: 0.2 }[sec?.kind] ?? 0.4;
     if (o.c % 4 !== 0 || !rng.chance(d * 0.5 + energy * 0.45)) return;
@@ -295,6 +341,45 @@ export function composeSong({ theme, steps, gen, seed }) {
     const leadSpan = song.spans[o.key] || 1;
     if (leadSpan > 1) song.spans[key] = leadSpan;
   });
+
+  // ---- Ostinato 伴奏句：一句音型全曲不變（身分錨），每半小節映射到當前和弦 ----
+  // Sharou《2:23 AM》手法：不變的伴奏句比會變的旋律更能定義一首歌
+  if (arch === 'ostinato') {
+    const FIGS = [
+      { steps: [0, 2, 4, 6], degs: [0, 1, 2, 1] }, // 上下波浪 8 分
+      { steps: [0, 2, 4, 6], degs: [0, 1, 2, 3] }, // 上行琶音（3＝高八度根音）
+      { steps: [0, 3, 6], degs: [0, 2, 1] },       // 附點搖曳
+      { steps: [0, 2, 4, 6], degs: [2, 1, 0, 1] }, // 下行波浪
+      { steps: [0, 2, 3, 6], degs: [0, 2, 1, 2] }, // 切分閃爍
+    ];
+    const fig = rng.pick(FIGS);
+    const base = rng.rint(60, 64); // 音域錨，低於主旋律讓出空間
+    sections.forEach(sec => {
+      if (!layerAt(sec).harm) return;
+      const start = sec.startBar * 16, end = start + sec.bars * 16;
+      for (let c0 = start; c0 < end; c0 += SEG) {
+        const pcs = pcsAt(Math.floor(c0 / SEG));
+        if (!pcs.length) continue;
+        const tones = [];
+        for (let m = base; m <= base + 16 && tones.length < 3; m++) if (pcs.includes(pc(m))) tones.push(m);
+        if (!tones.length) continue;
+        fig.steps.forEach((st, i) => {
+          const deg = fig.degs[i];
+          let midi = deg === 3 ? tones[0] + 12 : (tones[Math.min(deg, tones.length - 1)]);
+          let key = midiToRow(midi) + ',' + (c0 + st);
+          if (song.notes[key]) { // 撞到主旋律就改用相鄰和弦音——脈動不能斷
+            midi = tones[(Math.min(deg, tones.length - 1) + 1) % tones.length];
+            key = midiToRow(midi) + ',' + (c0 + st);
+          }
+          if (!song.notes[key]) {
+            song.notes[key] = 'harm';
+            const gap = (fig.steps[i + 1] ?? SEG) - st;
+            if (gap > 1) song.spans[key] = Math.min(gap, 2);
+          }
+        });
+      }
+    });
+  }
 
   // ---- 琶音（分解和弦）：chiptune 招牌織體，副歌/橋段鋪 8 分或 16 分上行循環 ----
   const arpInt = rD > 0.55 ? 2 : 4;
@@ -315,8 +400,8 @@ export function composeSong({ theme, steps, gen, seed }) {
     }
   }
 
-  // ---- 無鼓編曲：反拍和聲刺（oom-pah）扛起律動，取代長音和聲 ----
-  if (drumless) {
+  // ---- 無鼓編曲：反拍和聲刺（oom-pah）扛起律動，取代長音和聲（groove 原型限定）----
+  if (drumless && arch === 'groove') {
     sections.forEach(sec => {
       if (sec === introSec || arpSecs.has(sec)) return;
       const start = sec.startBar * 16, end = start + sec.bars * 16;
@@ -355,6 +440,7 @@ export function composeSong({ theme, steps, gen, seed }) {
     if (!pcs.length) continue;
     const root = pcs[0];
     const sec = sections.find(s => seg * SEG >= s.startBar * 16 && seg * SEG < (s.startBar + s.bars) * 16);
+    if (sec && layerAt(sec) && !layerAt(sec).bass) continue; // 紋理編舞：這段貝斯還沒進場
     if (sec?.kind === 'C' && rD < 0.5) { // 間奏 break：貝斯只留段首
       if (seg % 2 === 0) placeBass(song, seg * SEG, root, 4);
       continue;
@@ -394,6 +480,7 @@ export function composeSong({ theme, steps, gen, seed }) {
   // ---- 鼓 ----（無鼓編曲整組跳過）
   const hatPat = rD < 0.25 ? [0, 8] : rD < 0.5 ? [0, 4, 8, 12] : rD < 0.8 ? [0, 2, 4, 6, 8, 10, 12, 14] : [0, 2, 4, 6, 8, 10, 12, 14];
   if (!drumless) sections.forEach(sec => {
+    if (layerAt(sec) && !layerAt(sec).drums) return; // 紋理編舞：這段鼓還沒進場
     const start = sec.startBar * 16, end = start + sec.bars * 16;
     const quiet = sec.kind === 'C';
     const thinBars = sec === introSec ? Math.ceil(sec.bars / 2) : 0; // intro 前半：鼓只留踏鈸

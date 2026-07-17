@@ -119,6 +119,7 @@ window.chipforgeAuto = async function (opts = {}) {
       seed: song.seed, score: best ? Math.round(best.score * 1000) / 1000 : null,
       bpm: song.bpm, steps: song.steps, bars, loops, drumless: !!song.drumless,
       tone: (song.tone || {}).lead || null,
+      archetype: song.archetype || 'groove',
       loopDur: song.steps * (60 / song.bpm / 4), sampleRate: 44100,
       shareHash: hashOf(await songToUrl(song)),
       gen,
