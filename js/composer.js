@@ -240,8 +240,20 @@ export function composeSong({ theme, steps, gen, seed }) {
 
     let motif = null;
     const capture = sec.kind === 'A' || sec.kind === 'S';
-    // 雷特動機：使用者記住的動機強制開場（A/S 段第一段，B 段偶爾）
+    // 雷特動機：使用者記住/動機庫的動機強制開場（A/S 段開頭，B 段偶爾）
+    // 支援 16 步（整小節）動機：拆成兩個半小節 cell 連續鋪出，成為完整的 hook 句
     const ext = gen.motif && gen.motif.rhythm && gen.motif.rhythm.length >= 2;
+    let extCells = null;
+    if (ext) {
+      const rh = gen.motif.rhythm, ct = gen.motif.contour || [];
+      const a = { rhythm: [], contour: [] }, b = { rhythm: [], contour: [] };
+      rh.forEach((off, i) => {
+        const t = off < SEG ? a : b;
+        t.rhythm.push(off % SEG);
+        t.contour.push(ct[i] ?? 0);
+      });
+      extCells = [a.rhythm.length ? a : null, b.rhythm.length ? b : null];
+    }
     const useExtHere = ext && (sec.kind === 'A' || sec.kind === 'S' || (sec.kind === 'B' && rng.chance(0.4)));
     // 樂句問答：每 2 小節（4 段）為一句，問句尾懸在五度、答句尾解決到根音；
     // 答句重用問句的節奏與輪廓，只換終止 —— 這是「像人寫的」關鍵
@@ -256,10 +268,11 @@ export function composeSong({ theme, steps, gen, seed }) {
       const opts = isPhraseEnd
         ? { cadence: (isAnswer || isSectionEnd) ? 'root' : 'fifth', restTail: 3 }
         : {};
-      if (sg === 0 && useExtHere) {
-        const extMotif = { rhythm: gen.motif.rhythm, contour: gen.motif.contour, base: centerOf[sec.kind] || 71 };
-        motif = writeSegment(sec.kind, secStart, 0, extMotif, energy, true, opts);
-        qMotifs[0] = motif;
+      if (useExtHere && extCells && sg < 2 && extCells[sg]) {
+        const extMotif = { rhythm: extCells[sg].rhythm, contour: extCells[sg].contour, base: centerOf[sec.kind] || 71 };
+        const m = writeSegment(sec.kind, secStart, sg, extMotif, energy, true, opts);
+        qMotifs[pos] = m;
+        if (sg === 0) motif = m;
         continue;
       }
       let use = null, force = false;

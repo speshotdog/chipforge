@@ -8,6 +8,7 @@ import { forge } from './js/director.js';
 import { nightVariant, NIGHT_MIXER_PATCH } from './js/composer.js';
 import { defaultGen, defaultMixer } from './js/state.js';
 import { THEMES, THEME_ORDER } from './js/themes.js';
+import { MOTIF_LIBRARY } from './js/motifs.js';
 import { ChipSynth } from './js/synth.js';
 import { scheduleStep } from './js/scheduler.js';
 import { songToUrl, songFromHash } from './js/exporter.js';
@@ -88,6 +89,13 @@ window.chipforgeAuto = async function (opts = {}) {
   const loops = opts.loops ?? 2;
   const gen = { ...defaultGen(), ...(opts.gen || {}) };
   if (opts.director) gen.director = opts.director;
+  // 動機庫：opts.motifId 從庫挑、opts.motif 直接給（rhythm/contour 16 步格式）
+  if (opts.motifId) {
+    const m = MOTIF_LIBRARY.find(x => x.id === opts.motifId);
+    if (m) gen.motif = { rhythm: m.rhythm, contour: m.contour };
+  } else if (opts.motif && opts.motif.rhythm) {
+    gen.motif = { rhythm: opts.motif.rhythm, contour: opts.motif.contour || [] };
+  }
 
   let song, best = null, picked = [];
   if (opts.songHash) {
@@ -120,6 +128,7 @@ window.chipforgeAuto = async function (opts = {}) {
       bpm: song.bpm, steps: song.steps, bars, loops, drumless: !!song.drumless,
       tone: (song.tone || {}).lead || null,
       archetype: song.archetype || 'groove',
+      motifId: opts.motifId || (gen.motif ? 'custom' : null),
       loopDur: song.steps * (60 / song.bpm / 4), sampleRate: 44100,
       shareHash: hashOf(await songToUrl(song)),
       gen,
