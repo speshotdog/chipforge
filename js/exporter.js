@@ -80,7 +80,7 @@ export function exportMidi(song, mixer) {
     bass: { ch: 2, prog: 38 }, noise: { ch: 3, prog: 99 },
   };
   // 音色 → GM 音色對應（song.tone 優先於混音台設定）
-  const TONE_PROG = { piano: 0, fm: 4, bell: 10, pluck: 24, saw: 81, organ: 19 };
+  const TONE_PROG = { piano: 0, fm: 4, bell: 10, pluck: 24, saw: 81, organ: 19, strings: 48 };
   const leadTone = (song.tone || {}).lead || (mixer.duty || {}).lead;
   const harmTone = (song.tone || {}).harm || (mixer.duty || {}).harm;
   if (TONE_PROG[leadTone] !== undefined) CHS.lead.prog = TONE_PROG[leadTone];

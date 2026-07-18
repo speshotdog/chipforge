@@ -6,7 +6,7 @@ export const THEMES = {
   // seishun / citypop / rainpop 淘汰（王道 J-rock、丸サ citypop、卡農抒情三案不對味）
   stardrive: {
     label: '星夜兜風', icon: '✪', bpm: [108, 132], scale: [0, 2, 4, 5, 7, 9, 11],
-    tones: ['fm', 'saw', '25%'],
+    tones: ['fm', 'saw', 'strings', '25%'],
     progs: [['Am', 'F', 'G', 'C'], ['Am', 'F', 'C', 'G'], ['Fmaj7', 'G', 'Em7', 'Am7'], ['Dm7', 'G', 'C', 'Am']],
     rhythms: [[0, 3, 6], [0, 2, 4, 6], [0, 3, 4, 6], [0, 2, 3, 6], [0, 2, 4, 6, 7]],
     bassPat: [[0, 'r'], [2, 'o'], [4, '5'], [6, 'r'], [7, 'o']],
@@ -23,7 +23,7 @@ export const THEMES = {
   },
   confession: {
     label: '放學告白', icon: '♡', bpm: [88, 106], scale: [0, 2, 4, 5, 7, 9, 11],
-    tones: ['piano', 'fm', 'pluck'], // 2026-07-18 補味道：鋼琴優先＋doo-wop 三連搖擺
+    tones: ['piano', 'strings', 'fm'], // 2026-07-18 補味道：鋼琴/小提琴優先＋doo-wop 三連搖擺
     progs: [['C', 'Am', 'Dm7', 'G7'], ['C', 'Em', 'Am', 'G'], ['Fmaj7', 'Em7', 'Dm7', 'G7'], ['C', 'Am', 'F', 'G']],
     rhythms: [[0, 4], [0, 4, 6], [0, 2, 4], [0, 3, 4, 6], [0, 4, 5, 6]],
     bassPat: [[0, 'r'], [4, '5'], [6, 'r']],

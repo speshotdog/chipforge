@@ -121,7 +121,8 @@ window.chipforgeAuto = async function (opts = {}) {
     ? mergeMixer(mixer, { duty: song.tone }) : mixer;
 
   const result = {
-    wavB64: await renderWav(song, dayMixer, loops),
+    // skipRender：曲庫量產模式——只作曲取 shareHash，不渲染 WAV（快 ~50 倍）
+    wavB64: opts.skipRender ? null : await renderWav(song, dayMixer, loops),
     meta: {
       theme: song.theme, label: T.label, icon: T.icon,
       seed: song.seed, score: best ? Math.round(best.score * 1000) / 1000 : null,
@@ -136,7 +137,7 @@ window.chipforgeAuto = async function (opts = {}) {
     },
   };
 
-  if (opts.night) {
+  if (opts.night && !opts.skipRender) {
     const night = nightVariant(song);
     // 自適應夜版速度：nightVariant 寫死 x0.78 對中慢速曲太慢（實測 BPM 106→83 拖行、
     // 171→133 剛好）。快歌維持 0.78，BPM<=115 只降 0.88，中間線性過渡。可用 opts.nightRatio 強制。

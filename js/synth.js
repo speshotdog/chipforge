@@ -136,7 +136,7 @@ export class ChipSynth {
 
     const gn = ctx.createGain();
     const osc = ctx.createOscillator();
-    let vol2 = vol, extra = null, punch = false, piano = false, bell = false, organ = false, wantVib = false, dutyAttack = false;
+    let vol2 = vol, extra = null, punch = false, piano = false, bell = false, organ = false, strings = false, wantVib = false, dutyAttack = false;
 
     if (inst === 'bass') {
       midi -= 12; dur *= 1.1;
@@ -181,6 +181,15 @@ export class ChipSynth {
         osc.setPeriodicWave(this.organWave);
         vol2 = vol * 0.9;
         organ = true;
+      } else if (dutySel === 'strings') {
+        // 小提琴/弦樂：雙鋸齒微失諧 + 慢起音（弓壓感）+ 低通柔化 + 延遲揉音
+        // 拉奏類音色的空白格——適合抒情主奏與對位聲部，快速音群會糊（勿進 battle 池）
+        osc.type = 'sawtooth';
+        osc.detune.value = -5;
+        vol2 = vol * 0.55;
+        extra = { gain: 0.9, type: 'sawtooth', detune: 6 };
+        strings = true;
+        wantVib = true;
       } else if (dutySel === 'saw') {
         // 鋸齒波雙簧微失諧——C64 SID／早期電腦遊戲系 lead
         osc.type = 'sawtooth';
@@ -258,6 +267,12 @@ export class ChipSynth {
       gn.gain.setValueAtTime(0, time);
       gn.gain.linearRampToValueAtTime(vol2, time + 0.04);
       gn.gain.setTargetAtTime(0, time + dur, 0.08);
+    } else if (strings) {
+      // 弓壓起音：緩進 → 滿弓微膨脹 → 收弓長放
+      gn.gain.setValueAtTime(0, time);
+      gn.gain.linearRampToValueAtTime(vol2 * 0.7, time + 0.06);
+      gn.gain.linearRampToValueAtTime(vol2, time + 0.16);
+      gn.gain.setTargetAtTime(0, time + dur, 0.09);
     } else {
       gn.gain.setValueAtTime(0, time);
       gn.gain.linearRampToValueAtTime(vol2, time + 0.004);
@@ -273,8 +288,17 @@ export class ChipSynth {
     }
 
     osc.connect(gn);
-    gn.connect(this.out(inst));
-    if (inst !== 'bass') gn.connect(this.echoSend);
+    if (strings) {
+      // 低通柔化：磨掉鋸齒的毛邊，才像弓摩擦弦而不是合成器
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 2600; lp.Q.value = 0.5;
+      gn.connect(lp);
+      lp.connect(this.out(inst));
+      lp.connect(this.echoSend);
+    } else {
+      gn.connect(this.out(inst));
+      if (inst !== 'bass') gn.connect(this.echoSend);
+    }
 
     const tail = bell ? Math.max(dur, 0.8) + 0.6 : dur + 0.4;
     if (extra) {

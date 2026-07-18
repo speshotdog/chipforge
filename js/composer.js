@@ -4,6 +4,10 @@ import { CHORDS, SUB_DARK, SUB_BRIGHT, SEC_DOM, Rng, pc, midiToRow, rowToMidi, i
 import { THEMES, planSections, CATEGORIES } from './themes.js';
 import { emptySong } from './state.js';
 
+// 引擎版本：composer/synth 有影響作曲結果的改動就 bump。
+// 「同 seed 同曲」只在同版引擎內成立——舊曲重鍛不一樣時，看這個欄位就知道原因
+export const ENGINE_VER = '2026.07.18';
+
 // ---- 主奏音色池：依主題分類抽，同主題不同 seed 會拿到不同樂器 ----
 // 名義上是 8bit，實際目標是「復古遊戲感」——泰拉瑞亞/Undertale 都不是純方波
 const THEME_CAT = {};
@@ -66,6 +70,7 @@ export function composeSong({ theme, steps, gen, seed }) {
   song.steps = steps;
   song.theme = theme;
   song.seed = seed;
+  song.engineVer = ENGINE_VER;
   song.chords = [];
   song.transpose = rng.rint(-5, 6); // 整曲移調（播放時套用，音格仍以 C 調記譜）
   song.swing = !!T.swing;           // 主題級搖擺（scheduler 播放時套用）

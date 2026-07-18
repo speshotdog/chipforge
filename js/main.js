@@ -189,6 +189,61 @@ async function boot() {
     return b;
   }
 
+  // ===== 精選曲庫：機器鍛造預選曲（songbook.js 按需載入，不佔首頁流量）=====
+  const songbookModal = $('songbookModal');
+  let songbook = null;
+  let sbTheme = null;
+  $('btnSongbook').onclick = async () => {
+    if (!songbook) {
+      try { songbook = (await import('./songbook.js')).SONGBOOK; }
+      catch (e) { forgeStatus.textContent = '曲庫尚未生成（tools/songbook_build.py）'; return; }
+    }
+    renderSongbook();
+    songbookModal.classList.remove('hidden');
+  };
+  $('btnSongbookClose').onclick = () => songbookModal.classList.add('hidden');
+  songbookModal.onclick = e => { if (e.target === songbookModal) songbookModal.classList.add('hidden'); };
+
+  async function loadFromSongbook(sg, label) {
+    const s = await songFromHash(sg.hash);
+    if (!s) { forgeStatus.textContent = '曲庫項目解析失敗'; return; }
+    transport.stop();
+    store.applySong(s);
+    syncSongTone();
+    bpmInput.value = store.song.bpm; bpmVal.textContent = store.song.bpm;
+    synth.setBpm(store.song.bpm);
+    songbookModal.classList.add('hidden');
+    forgeStatus.textContent = `已載入曲庫：${label}`;
+  }
+
+  function renderSongbook() {
+    const body = $('songbookBody');
+    body.innerHTML = '';
+    const themes = Object.keys(songbook).filter(t => songbook[t]?.length);
+    if (!themes.length) { body.textContent = '曲庫是空的'; return; }
+    if (!sbTheme || !themes.includes(sbTheme)) sbTheme = themes[0];
+    const tabs = document.createElement('div');
+    tabs.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px';
+    themes.forEach(t => {
+      const T = THEMES[t] || { label: t, icon: '' };
+      tabs.appendChild(mkBtn(`${T.icon} ${T.label}`, t === sbTheme ? 'gold' : '', () => { sbTheme = t; renderSongbook(); }));
+    });
+    body.appendChild(tabs);
+    const label = THEMES[sbTheme]?.label || sbTheme;
+    (songbook[sbTheme] || []).forEach((sg, i) => {
+      const row = document.createElement('div');
+      row.className = 'slot-row filled';
+      row.innerHTML = `<span class="slot-num">${i + 1}</span>
+        <div class="slot-info"><div class="slot-title">${label} 第 ${i + 1} 號</div>
+        <div class="slot-meta">${sg.bpm} BPM · ${sg.tone || '—'} · 評分 ${sg.score ?? '—'}</div></div>`;
+      const acts = document.createElement('div');
+      acts.className = 'slot-acts';
+      acts.append(mkBtn('載入', 'gold', () => loadFromSongbook(sg, `${label} ${i + 1} 號`)));
+      row.appendChild(acts);
+      body.appendChild(row);
+    });
+  }
+
   // ===== 工具列 =====
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.onclick = () => {
@@ -553,10 +608,10 @@ async function boot() {
     opts.className = 'mx-opts';
     opts.innerHTML = `
       <label>主旋律波形 <select data-k="dutyLead">
-        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option><option value="fm">FM 電鋼 ✨</option><option value="pluck">撥弦 🪕</option><option value="bell">音樂盒 🔔</option><option value="saw">鋸齒波 ⚡</option><option value="organ">管風琴 ⛪</option>
+        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option><option value="fm">FM 電鋼 ✨</option><option value="pluck">撥弦 🪕</option><option value="bell">音樂盒 🔔</option><option value="saw">鋸齒波 ⚡</option><option value="strings">小提琴 🎻</option><option value="organ">管風琴 ⛪</option>
       </select></label>
       <label>和聲波形 <select data-k="dutyHarm">
-        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option><option value="fm">FM 電鋼 ✨</option><option value="pluck">撥弦 🪕</option><option value="bell">音樂盒 🔔</option><option value="saw">鋸齒波 ⚡</option><option value="organ">管風琴 ⛪</option>
+        <option value="12.5%">方波 12.5%</option><option value="25%">方波 25%</option><option value="50%">方波 50%</option><option value="piano">鋼琴 🎹</option><option value="fm">FM 電鋼 ✨</option><option value="pluck">撥弦 🪕</option><option value="bell">音樂盒 🔔</option><option value="saw">鋸齒波 ⚡</option><option value="strings">小提琴 🎻</option><option value="organ">管風琴 ⛪</option>
       </select></label>
       <label>貝斯 <select data-k="bassWave">
         <option value="tri">三角波</option><option value="pulse">方波</option><option value="slap">擊弦</option>
