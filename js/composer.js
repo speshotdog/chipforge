@@ -9,6 +9,7 @@ import { emptySong } from './state.js';
 const THEME_CAT = {};
 for (const c of CATEGORIES) for (const t of c.themes) THEME_CAT[t] = c.id;
 const TONE_POOLS = {
+  jpop:     ['fm', '25%', 'fm', 'bell'],
   nature:   ['25%', 'pluck', 'pluck', '50%'],
   city:     ['fm', 'saw', '25%', 'fm'],
   village:  ['pluck', '25%', 'fm', 'pluck'],
@@ -129,6 +130,7 @@ export function composeSong({ theme, steps, gen, seed }) {
   const centerOf = { A: 71, A2: 71, B: 74, S: 76, C: 68 };
   let cur = rng.rint(70, 75);
   let storedA = null; // A 段內容（notes/spans/vels），供 A2 複製
+  let chorusHook = null; // 副歌動機（節奏骨架），供 post-chorus riff 用
   const leadOnsets = [];
 
   const pickRhythm = (energy) => {
@@ -246,13 +248,20 @@ export function composeSong({ theme, steps, gen, seed }) {
     let extCells = null;
     if (ext) {
       const rh = gen.motif.rhythm, ct = gen.motif.contour || [];
-      const a = { rhythm: [], contour: [] }, b = { rhythm: [], contour: [] };
-      rh.forEach((off, i) => {
-        const t = off < SEG ? a : b;
-        t.rhythm.push(off % SEG);
-        t.contour.push(ct[i] ?? 0);
-      });
-      extCells = [a.rhythm.length ? a : null, b.rhythm.length ? b : null];
+      const buildCells = mul => {
+        const cs = [];
+        rh.forEach((off, i) => {
+          const ci = Math.floor(off * mul / SEG);
+          (cs[ci] ||= { rhythm: [], contour: [] });
+          cs[ci].rhythm.push((off * mul) % SEG);
+          cs[ci].contour.push(ct[i] ?? 0);
+        });
+        for (let i = 0; i < cs.length; i++) if (!cs[i]) return null; // 出現空 cell 會斷句 → 放棄
+        return cs;
+      };
+      // Undertale 式變形重現：副歌有空間時 50% 機率增值（時值×2）——同一句動機的莊嚴版
+      const aug = sec.kind === 'S' && segs >= 4 && rng.chance(0.5);
+      extCells = (aug && buildCells(2)) || buildCells(1);
     }
     const useExtHere = ext && (sec.kind === 'A' || sec.kind === 'S' || (sec.kind === 'B' && rng.chance(0.4)));
     // 樂句問答：每 2 小節（4 段）為一句，問句尾懸在五度、答句尾解決到根音；
@@ -268,7 +277,20 @@ export function composeSong({ theme, steps, gen, seed }) {
       const opts = isPhraseEnd
         ? { cadence: (isAnswer || isSectionEnd) ? 'root' : 'fifth', restTail: 3 }
         : {};
-      if (useExtHere && extCells && sg < 2 && extCells[sg]) {
+      // 副歌 hook 迴圈：AAAB'——動機整段循環（立即重複是抓耳第一定律），
+      // 句尾懸五度、段尾解決到根音當變尾（B'）。副歌的旋律必須比主歌「笨」。
+      if (sec.kind === 'S' && sg > 0 && ((useExtHere && extCells) || motif)) {
+        const loopOpts = isSectionEnd ? { cadence: 'root', restTail: 3 }
+          : isPhraseEnd ? { cadence: 'fifth', restTail: 2 } : {};
+        let lm = motif;
+        if (useExtHere && extCells) {
+          const cell = extCells[sg % extCells.length];
+          lm = { rhythm: cell.rhythm, contour: cell.contour, base: centerOf.S };
+        }
+        writeSegment(sec.kind, secStart, sg, lm, energy, true, loopOpts);
+        continue;
+      }
+      if (useExtHere && extCells && sg < extCells.length && extCells[sg]) {
         const extMotif = { rhythm: extCells[sg].rhythm, contour: extCells[sg].contour, base: centerOf[sec.kind] || 71 };
         const m = writeSegment(sec.kind, secStart, sg, extMotif, energy, true, opts);
         qMotifs[pos] = m;
@@ -290,6 +312,7 @@ export function composeSong({ theme, steps, gen, seed }) {
       if (!isAnswer) qMotifs[pos] = m;
       if (sg === 0) motif = m;
     }
+    if (sec.kind === 'S' && motif && !chorusHook) chorusHook = motif;
     if (capture && sec.kind === 'A' && !storedA) {
       const notes = {}, spans = {}, vels = {};
       for (const [k, v] of Object.entries(song.notes)) {
@@ -328,6 +351,13 @@ export function composeSong({ theme, steps, gen, seed }) {
     arpOk ? sections.filter(s => (s.kind === 'S' || s.kind === 'B') && s !== introSec) : []
   );
 
+  // ---- 管絃編曲語法開關（管絃縮編思維：pulse2 當第二小提琴/銅管，不只是和聲填充）----
+  // groove 限定；ostinato/solo 的紋理身分是「不變的伴奏句/獨奏留白」，不套管絃層
+  const orch = arch === 'groove'
+    ? { counter: rng.chance(0.65), tutti: rng.chance(0.75), echo: rng.chance(0.7) }
+    : { counter: false, tutti: false, echo: false };
+  const tuttiStartOf = sec => (sec.startBar + Math.ceil(sec.bars / 2)) * 16;
+
   // ---- 和聲（ハモリ）----
   const sorted = [...leadOnsets].sort((a, b) => a.c - b.c);
   if (arch !== 'ostinato') sorted.forEach(o => { // ostinato 的和聲通道整條讓給伴奏句
@@ -344,6 +374,8 @@ export function composeSong({ theme, steps, gen, seed }) {
       return;
     }
     if (drumless || !sec || sec === introSec || arpSecs.has(sec)) return; // intro 留白、琶音段交給琶音、無鼓時改用反拍刺
+    if (orch.counter && (sec.kind === 'B' || sec.kind === 'A2')) return; // 對位線接管和聲通道
+    if (orch.tutti && sec.kind === 'S' && o.c >= tuttiStartOf(sec)) return; // 副歌後半讓給八度齊奏
     const energy = { A: 0.35, A2: 0.4, B: 0.5, S: 0.75, C: 0.2 }[sec?.kind] ?? 0.4;
     if (o.c % 4 !== 0 || !rng.chance(d * 0.5 + energy * 0.45)) return;
     const pcs = pcsAt(seg);
@@ -353,6 +385,61 @@ export function composeSong({ theme, steps, gen, seed }) {
     song.notes[key] = 'harm';
     const leadSpan = song.spans[o.key] || 1;
     if (leadSpan > 1) song.spans[key] = leadSpan;
+  });
+
+  // ---- 管絃編曲語法（DQ 式管絃縮編：先想管絃配器再縮回四軌）----
+  // tutti＝副歌後半 harm 貼主旋律低八度齊奏＋主旋律加重音（銅管 tutti、動態階梯最高層）
+  // counter＝B 段對位線：半小節頭貼和弦音定錨，主旋律讓出的空隙級進行走（第二小提琴會唱的線）
+  // echo＝間奏聲部問答：主旋律句半小節後被低八度回聲（木管問、銅管答）
+  if (orch.tutti) sections.filter(s => s.kind === 'S').forEach(sec => {
+    const t0 = tuttiStartOf(sec), end = (sec.startBar + sec.bars) * 16;
+    for (const o of leadOnsets) {
+      if (o.c < t0 || o.c >= end) continue;
+      const h = o.midi - 12;
+      if (h < HARM_LO) continue;
+      const key = midiToRow(h) + ',' + o.c;
+      if (!song.notes[key]) {
+        song.notes[key] = 'harm';
+        if (song.spans[o.key]) song.spans[key] = song.spans[o.key];
+      }
+      song.vels[o.key] = 2;
+    }
+  });
+  // 對位線放 A2（主題重現時加第二小提琴——管絃變奏定石）與 B；琶音段讓給琶音
+  if (orch.counter) sections.filter(s => (s.kind === 'B' || s.kind === 'A2') && s !== introSec && !arpSecs.has(s)).forEach(sec => {
+    const start = sec.startBar * 16, end = start + sec.bars * 16;
+    const leadAt = new Set(leadOnsets.filter(o => o.c >= start && o.c < end).map(o => o.c));
+    let cm = 67;
+    for (let c = start; c < end; c += 2) {
+      const pcs = pcsAt(Math.floor(c / SEG));
+      if (!pcs.length) continue;
+      if (c % SEG === 0) {
+        cm = nearestChordTone(cm, pcs, HARM_LO, 72);
+      } else {
+        if (leadAt.has(c) || leadAt.has(c + 1) || leadAt.has(c - 1) || !rng.chance(0.6)) continue;
+        const scale = chordAwareScale(T.scale, pcs, T.keepClash);
+        cm = scaleWalk(cm, scale, rng.chance(0.5) ? 1 : -1, HARM_LO, 72);
+      }
+      const key = midiToRow(cm) + ',' + c;
+      if (!song.notes[key]) { song.notes[key] = 'harm'; song.spans[key] = 2; }
+    }
+  });
+  if (orch.echo) sections.filter(s => s.kind === 'C' && s.bars >= 2).forEach(sec => {
+    const start = sec.startBar * 16, end = start + sec.bars * 16;
+    for (const o of leadOnsets) {
+      if (o.c < start || o.c + 8 >= end) continue;
+      const c2 = o.c + 8;
+      let occupied = false;
+      for (let r = 0; r < 24; r++) if (song.notes[r + ',' + c2] === 'lead') occupied = true;
+      if (occupied) continue;
+      const pcs = pcsAt(Math.floor(c2 / SEG));
+      const midi = pcs.length ? nearestChordTone(Math.max(HARM_LO, o.midi - 12), pcs, HARM_LO, HARM_HI) : Math.max(HARM_LO, o.midi - 12);
+      const key = midiToRow(midi) + ',' + c2;
+      if (!song.notes[key]) {
+        song.notes[key] = 'harm';
+        if (song.spans[o.key]) song.spans[key] = Math.min(song.spans[o.key], 4);
+      }
+    }
   });
 
   // ---- Ostinato 伴奏句：一句音型全曲不變（身分錨），每半小節映射到當前和弦 ----
@@ -555,6 +642,175 @@ export function composeSong({ theme, steps, gen, seed }) {
     }
   }
 
+  // ---- 進副歌工程：五種 entry，同一首歌固定一種（JPOP 式多樣化）----
+  // build ＝上行線＋鼓漸密＋屬音踏板＋空拍（燃系）
+  // lift  ＝IV→V 和聲走升＋琶音爬升（王道 JPOP 推升）
+  // pickup＝弱起：三個八分音符「唱」進副歌（歌謠感）
+  // fill  ＝旋律收長音＋鼓過門（樂團感）
+  // brake ＝半速煞車：高音長懸＋全停一拍（蓄力反差）
+  const bsIdx = sections.findIndex((s, i) => s.kind === 'B' && sections[i + 1]?.kind === 'S');
+  if (arch === 'groove' && bsIdx >= 0 && !T.jingle && rng.chance(0.85)) {
+    const bSec = sections[bsIdx];
+    const s0 = sections[bsIdx + 1].startBar * 16;
+    // 2026-07-18 用戶裁決：build/pickup/brake 過關進隨機池；lift/fill 淘汰（仍可用 gen.chorusEntry 強制）
+    let entry = ['build', 'lift', 'pickup', 'fill', 'brake'].includes(gen.chorusEntry)
+      ? gen.chorusEntry
+      : rng.pick(bSec.bars >= 2
+        ? ['build', 'build', 'pickup', 'pickup', 'brake']
+        : ['pickup', 'pickup', 'brake']);
+    if (entry === 'build' && bSec.bars < 2) entry = 'pickup';
+    song.chorusEntry = entry;
+    const clearNotes = (from, to, kinds) => {
+      for (const [k, v] of Object.entries(song.notes)) {
+        if (kinds && !kinds.includes(v)) continue;
+        const c = +k.split(',')[1];
+        if (c >= from && c < to) {
+          delete song.notes[k]; delete song.spans[k]; delete song.vels[k];
+          if (song.slides) delete song.slides[k];
+        }
+      }
+    };
+    const clearDrums = (from, to) => {
+      for (const k of Object.keys(song.drums)) {
+        const c = +k.split(',')[1];
+        if (c >= from && c < to) delete song.drums[k];
+      }
+    };
+    const firstLeadAfter = c0 => {
+      for (let c = c0; c < c0 + 8; c++)
+        for (let r = 0; r < 24; r++)
+          if (song.notes[r + ',' + c] === 'lead') return rowToMidi(r);
+      return 76;
+    };
+
+    if (entry === 'build') {
+      const b0 = s0 - Math.min(2, bSec.bars) * 16;
+      const GAP = 4; // 爆發前空一拍：靜默比任何音都有力
+      clearNotes(b0, s0); clearDrums(b0, s0);
+      const target = firstLeadAfter(s0);
+      const climbEnd = s0 - GAP;
+      const nUp = Math.floor((climbEnd - b0) / 2);
+      for (let i = 0; i < nUp; i++) {
+        const c = b0 + i * 2;
+        const pcs2 = pcsAt(Math.floor(c / SEG));
+        const scale2 = chordAwareScale(T.scale, pcs2, T.keepClash);
+        const midi = scaleWalk(target, scale2, i - nUp, LEAD_LO, LEAD_HI);
+        const key = midiToRow(midi) + ',' + c;
+        song.notes[key] = 'lead';
+        song.spans[key] = 2;
+        if (i >= nUp - 2) song.vels[key] = 2;
+      }
+      const sPcs = pcsAt(Math.floor(s0 / SEG));
+      const domPc = ((sPcs[0] ?? 0) + 7) % 12;
+      for (let c = b0; c < climbEnd; c += 4) placeBass(song, c, domPc, 4);
+      if (!drumless) for (let c = b0; c < climbEnd; c++) {
+        const rel = c - b0;
+        if (c >= s0 - 16 || rel % 2 === 0) song.drums['1,' + c] = c >= s0 - 8 ? 2 : 1;
+        if (rel % 16 === 0) song.drums['0,' + c] = 1;
+      }
+    } else if (entry === 'lift') {
+      // 最後 1 小節：和聲改走 IV→V（王道進行的推升段），琶音一路爬，短空拍後開唱
+      const b0 = s0 - 16, GAP = 2;
+      clearNotes(b0, s0); clearDrums(s0 - 8, s0);
+      const segIdx = Math.floor(b0 / SEG);
+      const domName = SEC_DOM[song.chords[Math.floor(s0 / SEG)]] || 'G';
+      song.chords[segIdx] = 'F';
+      song.chords[segIdx + 1] = domName;
+      [['F', b0], [domName, b0 + SEG]].forEach(([ch, base]) => {
+        const pcs2 = CHORDS[ch] || [5, 9, 0];
+        const tones = [];
+        for (let m2 = 65; m2 <= 83 && tones.length < 4; m2++) if (pcs2.includes(pc(m2))) tones.push(m2);
+        const end = base + SEG - (base + SEG === s0 ? GAP : 0);
+        let i = 0;
+        for (let c = base; c < end; c += 2) {
+          const midi = tones[Math.min(i++, tones.length - 1)];
+          const key = midiToRow(midi) + ',' + c;
+          song.notes[key] = 'lead';
+          song.spans[key] = 2;
+          if (c >= s0 - 6) song.vels[key] = 2;
+        }
+        placeBass(song, base, pcs2[0], SEG);
+      });
+      if (!drumless) {
+        song.drums['0,' + b0] = 1; song.drums['0,' + (b0 + SEG)] = 1;
+        song.drums['1,' + (s0 - 4)] = 2; song.drums['1,' + (s0 - 3)] = 2;
+      }
+    } else if (entry === 'pickup') {
+      // 弱起：清掉尾巴 3 拍的旋律，三個八分音符級進「唱」進副歌第一音（無空拍，歌接歌）
+      clearNotes(s0 - 6, s0, ['lead', 'harm']);
+      clearDrums(s0 - 4, s0);
+      const target = firstLeadAfter(s0);
+      const pcs2 = pcsAt(Math.floor((s0 - 1) / SEG));
+      const scale2 = chordAwareScale(T.scale, pcs2, T.keepClash);
+      [6, 4, 2].forEach((back, i) => {
+        const midi = scaleWalk(target, scale2, i - 3, LEAD_LO, LEAD_HI);
+        const key = midiToRow(midi) + ',' + (s0 - back);
+        song.notes[key] = 'lead';
+        song.spans[key] = 2;
+        if (i === 2) song.vels[key] = 2;
+      });
+    } else if (entry === 'fill') {
+      // 樂團感：旋律提早收成長音讓位，最後半小節鼓組打過門衝進副歌
+      const b0 = s0 - 16;
+      clearNotes(b0, s0, ['lead', 'harm']);
+      const pcs2 = pcsAt(Math.floor(b0 / SEG));
+      const midi = nearestChordTone(74, pcs2, LEAD_LO, LEAD_HI);
+      const key = midiToRow(midi) + ',' + b0;
+      song.notes[key] = 'lead';
+      song.spans[key] = 12;
+      if (!drumless) {
+        clearDrums(b0 + 8, s0);
+        song.drums['0,' + (b0 + 8)] = 1;
+        song.drums['1,' + (b0 + 10)] = 1;
+        song.drums['1,' + (b0 + 12)] = 1;
+        song.drums['1,' + (b0 + 13)] = 1;
+        [14, 15].forEach(o => song.drums['1,' + (b0 + o)] = 2);
+      }
+    } else {
+      // brake：半速煞車——高音長懸＋貝斯半拍脈動，然後全停一拍再爆
+      const b0 = s0 - 16, GAP = 4;
+      clearNotes(b0, s0); clearDrums(b0, s0);
+      const pcs2 = pcsAt(Math.floor(b0 / SEG));
+      const midi = nearestChordTone(79, pcs2, 72, LEAD_HI);
+      const key = midiToRow(midi) + ',' + b0;
+      song.notes[key] = 'lead';
+      song.spans[key] = 16 - GAP;
+      song.vels[key] = 2;
+      placeBass(song, b0, pcs2[0] ?? 0, 4);
+      placeBass(song, b0 + 8, pcs2[0] ?? 0, 4);
+      if (!drumless) song.drums['0,' + b0] = 2;
+      const nk = midiToRow(78) + ',' + b0;
+      if (!song.notes[nk]) song.notes[nk] = 'noise';
+    }
+  }
+
+  // ---- Post-chorus riff：副歌後 1 小節器樂 riff（動機節奏＋和弦音高低彈跳）----
+  // 現代流行樂的 post-chorus hook——副歌唱完，樂器再把 hook 的節奏講一次
+  const sIdx = sections.findIndex(s => s.kind === 'S');
+  const afterS = sIdx >= 0 ? sections[sIdx + 1] : null;
+  if (arch === 'groove' && chorusHook && afterS && afterS.kind !== 'S' && rng.chance(0.7)) {
+    const r0 = afterS.startBar * 16;
+    for (let c = r0; c < r0 + 16; c++)
+      for (let r = 0; r < 24; r++) {
+        const k = r + ',' + c;
+        if (song.notes[k] === 'lead') { delete song.notes[k]; delete song.spans[k]; delete song.vels[k]; }
+      }
+    for (let half = 0; half < 2; half++) {
+      const base = r0 + half * SEG;
+      const pcs2 = pcsAt(Math.floor(base / SEG));
+      if (!pcs2.length) continue;
+      chorusHook.rhythm.forEach((off, i) => {
+        if (off >= SEG) return;
+        const midi = nearestChordTone(i % 2 === 0 ? 77 : 70, pcs2, LEAD_LO, LEAD_HI);
+        const k = midiToRow(midi) + ',' + (base + off);
+        if (!song.notes[k]) {
+          song.notes[k] = 'lead';
+          if (i === 0) song.vels[k] = 2;
+        }
+      });
+    }
+  }
+
   // ---- 修復通道 ----
   repairSong(song, T, sections, rng);
   return song;
@@ -632,7 +888,34 @@ export function repairSong(song, T, sections, rng) {
     }
   });
 
-  // 3. 終止式：全曲最後一個 lead → 第一個和弦的根音（回到主和弦感），拉長
+  // 3. 對位法則（jrleszcz/counterpoint 規則移植）：
+  // 3a. 唯一 climax——全曲最高音只出現一次，重複的高點會稀釋高潮
+  const leadsCx = collectLead(song);
+  if (leadsCx.length > 3) {
+    const peak = Math.max(...leadsCx.map(o => o.midi));
+    const peaks = leadsCx.filter(o => o.midi === peak);
+    if (peaks.length > 1) {
+      const keep = peaks[Math.min(peaks.length - 1, Math.floor(peaks.length * 0.7))]; // 留偏後段的那個（高潮靠副歌）
+      for (const o of peaks) {
+        if (o === keep) continue;
+        const pcs = CHORDS[song.chords[Math.floor(o.c / SEG)]] || [0, 4, 7];
+        moveLead(song, o, nearestChordTone(o.midi - 3, pcs, LEAD_LO, o.midi - 1));
+      }
+    }
+  }
+  // 3b. 大跳後反向級進——跳進(≥5半音)之後同向續跳的音折返，輪廓才像人唱的
+  const leadsLp = collectLead(song);
+  for (let i = 2; i < leadsLp.length; i++) {
+    const a = leadsLp[i - 2], b = leadsLp[i - 1], o = leadsLp[i];
+    const leap = b.midi - a.midi, next = o.midi - b.midi;
+    if (Math.abs(leap) >= 5 && Math.sign(next) === Math.sign(leap) && Math.abs(next) > 2) {
+      const pcs = CHORDS[song.chords[Math.floor(o.c / SEG)]] || [0, 4, 7];
+      const scale = chordAwareScale(T.scale, pcs, T.keepClash);
+      moveLead(song, o, scaleWalk(b.midi, scale, leap > 0 ? -1 : 1, LEAD_LO, LEAD_HI));
+    }
+  }
+
+  // 4. 終止式：全曲最後一個 lead → 第一個和弦的根音（回到主和弦感），拉長
   const leads3 = collectLead(song);
   const fin = leads3[leads3.length - 1];
   if (fin) {

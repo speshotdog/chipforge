@@ -28,13 +28,26 @@ export class ChipSynth {
     this.comp.connect(this.limiter);
     this.limiter.connect(ctx.destination);
 
+    // NES APU 式非線性混音：真機各聲道不是線性相加，疊越多壓越扁
+    // （NESdev 混音公式的 tanh 軟飽和近似，餵進 comp 前先過一道）
+    this.shaper = ctx.createWaveShaper();
+    {
+      const n = 1024, curve = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = i / (n - 1) * 2 - 1;
+        curve[i] = Math.tanh(x * 1.6) / Math.tanh(1.6);
+      }
+      this.shaper.curve = curve;
+    }
+    this.shaper.connect(this.comp);
+
     // retro 濕/乾混音
     this.retroWet = ctx.createGain(); this.retroWet.gain.value = 0.6;
     this.retroDry = ctx.createGain(); this.retroDry.gain.value = 0.4;
     if (this.retroNode) {
       this.retroNode.connect(this.retroWet);
-      this.retroWet.connect(this.comp);
-      this.retroDry.connect(this.comp);
+      this.retroWet.connect(this.shaper);
+      this.retroDry.connect(this.shaper);
     }
     this.routeRetro(!!m.retro);
 
@@ -84,7 +97,7 @@ export class ChipSynth {
     if (on && this.retroNode) {
       this.master.connect(this.retroNode);
       this.master.connect(this.retroDry);
-    } else this.master.connect(this.comp);
+    } else this.master.connect(this.shaper);
   }
 
   syncMixer() {
@@ -123,7 +136,7 @@ export class ChipSynth {
 
     const gn = ctx.createGain();
     const osc = ctx.createOscillator();
-    let vol2 = vol, extra = null, punch = false, piano = false, bell = false, organ = false, wantVib = false;
+    let vol2 = vol, extra = null, punch = false, piano = false, bell = false, organ = false, wantVib = false, dutyAttack = false;
 
     if (inst === 'bass') {
       midi -= 12; dur *= 1.1;
@@ -181,6 +194,8 @@ export class ChipSynth {
         if (inst === 'lead' && m.pwm) {
           osc.detune.value = -6; vol2 = vol * 0.55;
           extra = { detune: 6, gain: 1, duty };
+        } else if (inst === 'lead' && duty !== 0.5) {
+          dutyAttack = true; // 音頭疊 50% duty 亮起音（FamiTracker 式 duty 包絡）
         }
         wantVib = true;
       }
@@ -206,6 +221,23 @@ export class ChipSynth {
     } else if (punch) {
       osc.frequency.setValueAtTime(f * 1.7, time);
       osc.frequency.exponentialRampToValueAtTime(f, time + 0.06);
+    } else if (vel > 1.2 && inst === 'lead' && !extra && !piano && !bell && !organ) {
+      // 重音進入滑：從下方半音 scoop 進音高（真人吹奏感，只給方波主奏的重音）
+      osc.frequency.setValueAtTime(f * 0.945, time);
+      osc.frequency.exponentialRampToValueAtTime(f, time + 0.035);
+    }
+
+    if (dutyAttack) {
+      // duty 包絡：音頭 ~70ms 疊一層 50% duty，亮起音後讓位給本命音色
+      const ao = ctx.createOscillator();
+      ao.setPeriodicWave(this.waves[0.5]);
+      ao.frequency.value = f;
+      if (gf) { ao.frequency.setValueAtTime(f, time); ao.frequency.linearRampToValueAtTime(gf, time + Math.max(0.02, dur)); }
+      const ag = ctx.createGain();
+      ag.gain.setValueAtTime(0.55, time);
+      ag.gain.setTargetAtTime(0, time + 0.015, 0.03);
+      ao.connect(ag); ag.connect(gn);
+      ao.start(time); ao.stop(time + 0.12);
     }
 
     if (piano) {

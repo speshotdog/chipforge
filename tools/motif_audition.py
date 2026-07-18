@@ -66,6 +66,22 @@ def validate(m):
     return None
 
 
+def has_repeat_unit(m):
+    """重複單元＝歷來 keeper 的共同 DNA（同音反覆／音組重現／等距或重現的節奏型）。
+    沒有不算違規（單一大跳 hook 如 leap-of-faith 也能過），但會印警告提醒。"""
+    rh, ct = m["rhythm"], m["contour"]
+    if any(ct[i] == ct[i + 1] for i in range(len(ct) - 1)):
+        return True  # 同音反覆
+    pairs = [(ct[i], ct[i + 1]) for i in range(len(ct) - 1)]
+    if len(pairs) != len(set(pairs)):
+        return True  # 音組重現（如 0,4,0,4 的 oom-pah）
+    gaps = [rh[i + 1] - rh[i] for i in range(len(rh) - 1)]
+    if len(gaps) >= 3 and len(set(gaps)) == 1:
+        return True  # 等距節奏
+    gpairs = [(gaps[i], gaps[i + 1]) for i in range(len(gaps) - 1)]
+    return len(gpairs) != len(set(gpairs))  # 節奏型重現（如 2,4 / 2,4）
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default=None, help="外部候選 JSON 檔（陣列）")
@@ -87,6 +103,8 @@ def main():
         if err:
             print(f"[SKIP] {m['id']}: {err}")
             continue
+        if not has_repeat_unit(m):
+            print(f"[警告] {m['id']}: 缺重複單元（歷來 keeper 的共同 DNA），過關率恐偏低")
         ok.append(m)
 
     from playwright.sync_api import sync_playwright
@@ -104,8 +122,10 @@ def main():
                     "theme": m.get("theme", "bright"), "bars": args.bars,
                     "count": args.count, "loops": 2,
                     "motif": {"rhythm": m["rhythm"], "contour": m["contour"]},
-                    "gen": {"hook": 85, "sequenz": True},
+                    "gen": {"hook": 85, "sequenz": True, **(m.get("gen") or {})},
                 }
+                if m.get("mixer"):
+                    opts["mixer"] = m["mixer"]
                 r = page.evaluate("o => window.chipforgeAuto(o)", opts)
                 if errors:
                     raise RuntimeError("; ".join(errors))

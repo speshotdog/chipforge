@@ -1,6 +1,34 @@
 // 主題資料包：每個主題 = 純資料（BPM 範圍、音階、和弦進行池、節奏池、貝斯型、鼓型）
 // rhythms: 半小節(8步)內的起音位置。bassPat: [步位, 音型] r=根音 5=五度 o=高八度 3=三度
 export const THEMES = {
+  // ===== JPOP 流行（2026-07-18 新增：王道/小室/丸サ/卡農進行）=====
+  // 2026-07-18 用戶裁決：stardrive 特別好、idolstage 換樂器後留、confession 補搖擺後留；
+  // seishun / citypop / rainpop 淘汰（王道 J-rock、丸サ citypop、卡農抒情三案不對味）
+  stardrive: {
+    label: '星夜兜風', icon: '✪', bpm: [108, 132], scale: [0, 2, 4, 5, 7, 9, 11],
+    tones: ['fm', 'saw', '25%'],
+    progs: [['Am', 'F', 'G', 'C'], ['Am', 'F', 'C', 'G'], ['Fmaj7', 'G', 'Em7', 'Am7'], ['Dm7', 'G', 'C', 'Am']],
+    rhythms: [[0, 3, 6], [0, 2, 4, 6], [0, 3, 4, 6], [0, 2, 3, 6], [0, 2, 4, 6, 7]],
+    bassPat: [[0, 'r'], [2, 'o'], [4, '5'], [6, 'r'], [7, 'o']],
+    drums: { kick: [0, 4, 8, 12], snare: [4, 12] }, fill: true, minor: true
+  },
+  idolstage: {
+    label: '偶像舞台', icon: '♥', bpm: [138, 164], scale: [0, 2, 4, 5, 7, 9, 11],
+    tones: ['50%', 'fm', 'saw'], // 2026-07-18 換樂器：拿掉 bell/25%，改亮方波/電鋼/鋸齒
+
+    progs: [['C', 'G', 'Am', 'F'], ['Fmaj7', 'G', 'Em', 'Am'], ['F', 'G', 'C', 'Am'], ['Dm7', 'G7', 'C', 'Am']],
+    rhythms: [[0, 2, 4], [0, 2, 4, 6], [0, 2, 3, 4, 6], [0, 4, 5, 6], [0, 2, 4, 5, 6]],
+    bassPat: [[0, 'r'], [2, 'r'], [4, '5'], [6, 'o']],
+    drums: { kick: [0, 8], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14] }, fill: true
+  },
+  confession: {
+    label: '放學告白', icon: '♡', bpm: [88, 106], scale: [0, 2, 4, 5, 7, 9, 11],
+    tones: ['piano', 'fm', 'pluck'], // 2026-07-18 補味道：鋼琴優先＋doo-wop 三連搖擺
+    progs: [['C', 'Am', 'Dm7', 'G7'], ['C', 'Em', 'Am', 'G'], ['Fmaj7', 'Em7', 'Dm7', 'G7'], ['C', 'Am', 'F', 'G']],
+    rhythms: [[0, 4], [0, 4, 6], [0, 2, 4], [0, 3, 4, 6], [0, 4, 5, 6]],
+    bassPat: [[0, 'r'], [4, '5'], [6, 'r']],
+    drums: { kick: [0, 8], snare: [12] }, fill: false, swing: true
+  },
   bright: {
     label: '明亮草原', icon: '☀', bpm: [128, 160], scale: [0, 2, 4, 5, 7, 9, 11],
     progs: [['C', 'F', 'G', 'C'], ['C', 'Am', 'F', 'G'], ['F', 'G', 'C', 'C'], ['C', 'G', 'Am', 'F']],
@@ -1111,6 +1139,7 @@ export const THEME_ORDER = Object.keys(THEMES);
 
 // 曲風分類選單
 export const CATEGORIES = [
+  { id: 'jpop',     label: 'JPOP流行', themes: ['stardrive', 'idolstage', 'confession'] },
   { id: 'nature',   label: '大自然',   themes: ['bright', 'forest', 'snow', 'desert', 'beach', 'cave', 'swamp', 'mountain', 'firefly', 'waterfall', 'flowerfield', 'thunderstorm', 'deepsea', 'aurora', 'bamboo'] },
   { id: 'city',     label: '都市',     themes: ['edm', 'factory', 'neon', 'station', 'rooftop', 'cafestreet', 'subway', 'skyline', 'nightmarket', 'citypark', 'mall', 'ferriswheel', 'rainstreet', 'gamecenter', 'overpass'] },
   { id: 'village',  label: '村莊',     themes: ['pastoral', 'wafu', 'fishing', 'market', 'hamlet', 'bakery', 'florist', 'clocktower', 'farm', 'windmill', 'festvillage', 'wellside', 'ranch', 'chapel', 'orchard'] },
